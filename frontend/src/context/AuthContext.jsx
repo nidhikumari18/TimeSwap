@@ -18,7 +18,8 @@ import {
     }, []);
   
     const checkAuth = async () => {
-      const token = localStorage.getItem("token");
+      // Use consistent token key: skillswap_token
+      const token = localStorage.getItem("skillswap_token");
   
       // No token = definitely logged out
       if (!token) {
@@ -38,7 +39,7 @@ import {
             error.message
         );
   
-        localStorage.removeItem("token");
+        localStorage.removeItem("skillswap_token");
         setUser(null);
       } finally {
         setLoading(false);
@@ -46,13 +47,14 @@ import {
     };
   
     const login = (token, userData) => {
-      localStorage.setItem("token", token);
+      // Use consistent token key: skillswap_token
+      localStorage.setItem("skillswap_token", token);
   
       setUser(userData);
     };
   
     const logout = () => {
-      localStorage.removeItem("token");
+      localStorage.removeItem("skillswap_token");
   
       setUser(null);
     };
@@ -64,6 +66,7 @@ import {
           loading,
           login,
           logout,
+          setUser,
         }}
       >
         {children}
