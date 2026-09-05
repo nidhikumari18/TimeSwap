@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
   ArrowRight,
   Sparkles,
 } from "lucide-react";
 
+import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
 function Login() {
@@ -33,10 +34,14 @@ function Login() {
     setLoading(true);
 
     try {
-      await login(
-        formData.email,
-        formData.password
-      );
+      const response = await api.post("/auth/login", {
+        email: formData.email,
+        password: formData.password,
+      });
+
+      const { token, user } = response.data;
+
+      login(token, user);
 
       navigate("/dashboard");
     } catch (error) {
@@ -161,7 +166,7 @@ function Login() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="group flex w-full items-center justify-center gap-2 rounded-2xl bg-[#292722] px-5 py-3.5 text-sm font-medium text-white transition hover:bg-[#403d37] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="group flex w-full items-center justify-center gap-2 rounded-2xl bg-[#292722] px-5 py-3.5 text-sm font-medium text-white transition hover:bg-[#403d37] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {loading ? "Signing in..." : "Sign in"}
 
