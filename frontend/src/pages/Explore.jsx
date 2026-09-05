@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -37,19 +37,14 @@ function Explore() {
       setLoading(true);
       setError("");
 
-      const response = await api.get("/users/matches");
+      // Use the correct /users/explore endpoint
+      const response = await api.get("/users/explore");
 
-      const data = response.data;
-
-      const people =
-        data.users ||
-        data.matches ||
-        data ||
-        [];
+      const peopleList = response.data.users || [];
 
       setUsers(
-        Array.isArray(people)
-          ? people.filter(
+        Array.isArray(peopleList)
+          ? peopleList.filter(
               (person) =>
                 person._id !== user?._id
             )
@@ -102,14 +97,22 @@ function Explore() {
       setRequestingId(person._id);
       setSuccessUser("");
 
-      const skill =
+      // Select the first skill they teach
+      const skillTheyTeach =
         person.skillsToTeach?.[0] ||
         "Skill exchange";
 
+      // Select the first skill we can teach them
+      const skillTheyWant =
+        user?.skillsToTeach?.[0] ||
+        "My skill";
+
+      // Send request with correct field names matching SwapRequest model
       await api.post("/swaps/request", {
         receiverId: person._id,
-        skill,
-        message: `Hi ${person.name}! I'd love to learn ${skill} from you and share my skills too. 🌷`,
+        skillTheyTeach,
+        skillTheyWant,
+        message: `Hi ${person.name}! I'd love to learn ${skillTheyTeach} from you and share ${skillTheyWant} with you. 🌷`,
       });
 
       setSuccessUser(person.name);
@@ -127,11 +130,8 @@ function Explore() {
 
   /* ---------------- FILTER USERS ---------------- */
 
-  const filteredUsers = useMemo(() => {
-    const value =
-      search.toLowerCase().trim();
-
-    return users
+  const filteredUsers = Array.isArray(users)
+    ? users
       .filter((person) => {
 
         if (activeFilter === "Teaching") {
@@ -150,7 +150,9 @@ function Explore() {
       })
       .filter((person) => {
 
-        if (!value) return true;
+        if (!search) return true;
+
+        const value = search.toLowerCase().trim();
 
         const name =
           person.name?.toLowerCase() || "";
@@ -180,13 +182,8 @@ function Explore() {
         (a, b) =>
           calculateMatch(b) -
           calculateMatch(a)
-      );
-  }, [
-    users,
-    search,
-    activeFilter,
-    user,
-  ]);
+      )
+    : [];
 
 
   return (
@@ -688,7 +685,7 @@ function UserCard({
 
   return (
     <article
-      className={`group relative overflow-hidden rounded-[24px] border border-[#e3ddd5] ${cardBackgrounds[index % 4]} p-5 transition duration-200 hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(0,0,0,0.06)] sm:p-6`}
+      className={`group relative overflow-hidden rounded-[24px] border border-[#e3ddd5] ${cardBackgrounds[index % 4]} p-5 transition duration-200 hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(0,0,0,0.05)]`}
     >
 
       {/* ================================================= */}
