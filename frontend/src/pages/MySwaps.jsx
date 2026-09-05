@@ -18,7 +18,8 @@ import { useAuth } from "../context/AuthContext";
 function MySwaps() {
   const { user } = useAuth();
 
-  const [requests, setRequests] = useState([]);
+  const [incomingRequests, setIncomingRequests] = useState([]);
+  const [sentRequests, setSentRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updatingId, setUpdatingId] = useState(null);
@@ -32,18 +33,17 @@ function MySwaps() {
       setLoading(true);
       setError("");
 
-      const response = await api.get("/swaps/request/status");
+      // Fetch incoming and sent requests separately using the actual backend routes
+      const [incomingRes, sentRes] = await Promise.all([
+        api.get("/swaps/received"),
+        api.get("/swaps/sent"),
+      ]);
 
-      const data = response.data;
-
-      const list =
-        data.requests ||
-        data.swaps ||
-        data ||
-        [];
-
-      setRequests(
-        Array.isArray(list) ? list : []
+      setIncomingRequests(
+        incomingRes.data.requests || []
+      );
+      setSentRequests(
+        sentRes.data.requests || []
       );
     } catch (error) {
       console.error(error);
@@ -72,7 +72,8 @@ function MySwaps() {
         }
       );
 
-      setRequests((previous) =>
+      // Update incoming requests
+      setIncomingRequests((previous) =>
         previous.map((request) =>
           request._id === requestId
             ? {
@@ -95,38 +96,13 @@ function MySwaps() {
   };
 
   /* -------------------------------- */
-  /* SPLIT REQUESTS */
+  /* ACCEPTED REQUESTS */
   /* -------------------------------- */
 
-  const incomingRequests = requests.filter(
-    (request) => {
-      const receiver =
-        request.receiver?._id ||
-        request.receiverId ||
-        request.receiver;
-
-      return (
-        receiver?.toString() ===
-        user?._id?.toString()
-      );
-    }
-  );
-
-  const sentRequests = requests.filter(
-    (request) => {
-      const sender =
-        request.sender?._id ||
-        request.senderId ||
-        request.sender;
-
-      return (
-        sender?.toString() ===
-        user?._id?.toString()
-      );
-    }
-  );
-
-  const acceptedRequests = requests.filter(
+  const acceptedRequests = [
+    ...incomingRequests,
+    ...sentRequests,
+  ].filter(
     (request) =>
       request.status?.toLowerCase() ===
       "accepted"
@@ -727,12 +703,12 @@ function RequestCard({
 
           <p className="text-[8px] uppercase tracking-[0.16em] text-[#aaa39a]">
             {type === "incoming"
-              ? "They want"
-              : "You want"}
+              ? "They teach"
+              : "They want"}
           </p>
 
           <p className="mt-1 text-[12px] font-semibold">
-            {request.skill ||
+            {request.skillTheyTeach ||
               "A new skill"}
           </p>
 
@@ -747,11 +723,14 @@ function RequestCard({
         <div className="text-right">
 
           <p className="text-[8px] uppercase tracking-[0.16em] text-[#aaa39a]">
-            Skill exchange
+            {type === "incoming"
+              ? "You offer"
+              : "You teach"}
           </p>
 
           <p className="mt-1 text-[12px] font-semibold">
-            Learn · Share
+            {request.skillTheyWant ||
+              "Your skill"}
           </p>
 
         </div>
@@ -765,7 +744,7 @@ function RequestCard({
         <div className="mt-4">
 
           <p className="text-[10px] leading-5 text-[#777168]">
-            “{request.message}”
+            "{request.message}"
           </p>
 
         </div>
@@ -961,7 +940,7 @@ function ActiveSwapCard({
       <div className="mt-5 flex items-center gap-2">
 
         <span className="rounded-full bg-white/70 px-3 py-1.5 text-[9px]">
-          {request.skill ||
+          {request.skillTheyTeach ||
             "Skill exchange"}
         </span>
 
@@ -970,7 +949,8 @@ function ActiveSwapCard({
         </span>
 
         <span className="rounded-full bg-white/70 px-3 py-1.5 text-[9px]">
-          Your skills
+          {request.skillTheyWant ||
+            "Your skills"}
         </span>
 
       </div>
