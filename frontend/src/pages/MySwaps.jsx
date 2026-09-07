@@ -1,28 +1,48 @@
-import { useEffect, useState } from "react";
+
+import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft,
   ArrowRight,
-  ArrowUpRight,
   Check,
+  CheckCircle2,
   Clock3,
+  Inbox,
   MessageCircle,
+  RefreshCw,
   Sparkles,
   Users,
   X,
 } from "lucide-react";
-import { Link } from "react-router-dom";
-
+import { useNavigate } from "react-router-dom";
 import api from "../services/api";
-import { useAuth } from "../context/AuthContext";
 
 function MySwaps() {
-  const { user } = useAuth();
+  const navigate = useNavigate();
 
-  const [incomingRequests, setIncomingRequests] = useState([]);
-  const [sentRequests, setSentRequests] = useState([]);
+  const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [updatingId, setUpdatingId] = useState(null);
+  const [activeTab, setActiveTab] = useState("all");
+
+  // =====================================================
+  // CURRENT USER
+  // =====================================================
+
+  const currentUser = useMemo(() => {
+    try {
+      const storedUser =
+        localStorage.getItem("user") ||
+        localStorage.getItem("timeswapUser");
+
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch (error) {
+      console.error("Failed to read current user:", error);
+      return null;
+    }
+  }, []);
+
+  // =====================================================
+  // LOAD SWAP REQUESTS
+  // =====================================================
 
   useEffect(() => {
     fetchRequests();
@@ -31,51 +51,227 @@ function MySwaps() {
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      setError("");
 
-      // Fetch incoming and sent requests separately using the actual backend routes
-      const [incomingRes, sentRes] = await Promise.all([
-        api.get("/swaps/received"),
-        api.get("/swaps/sent"),
-      ]);
+      const response = await api.get("/swaps/request/status");
 
-      setIncomingRequests(
-        incomingRes.data.requests || []
-      );
-      setSentRequests(
-        sentRes.data.requests || []
-      );
+      const data = response.data;
+
+      const list =
+        data?.requests ||
+        data?.swaps ||
+        data ||
+        [];
+
+      setRequests(Array.isArray(list) ? list : []);
     } catch (error) {
-      console.error(error);
-
-      setError(
-        error.response?.data?.message ||
-          "Couldn't load your swap requests."
-      );
+      console.error("Failed to load swap requests:", error);
+      setRequests([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const updateRequest = async (
-    requestId,
-    status
-  ) => {
+  // =====================================================
+  // STATUS HELPERS
+  // =====================================================
+
+  const getStatus = (request) => {
+    return (
+      request?.status ||
+      request?.requestStatus ||
+      "pending"
+    ).toLowerCase();
+  };
+
+  const getRequestId = (request) => {
+    return request?._id || request?.id;
+  };
+
+  // =====================================================
+  // PERSON HELPERS
+  // =====================================================
+
+  const getPerson = (request) => {
+    return (
+      request?.sender ||
+      request?.receiver ||
+      request?.user ||
+      request?.from ||
+      {}
+    );
+  };
+
+  const getPersonId = (person) => {
+    if (!person) return null;
+
+    if (typeof person === "string") {
+      return person;
+    }
+
+    return (
+      person?._id ||
+      person?.id ||
+      person?.userId ||
+      null
+    );
+  };
+
+  const getName = (request) => {
+    const person = getPerson(request);
+
+    return (
+      person?.name ||
+      person?.fullName ||
+      request?.name ||
+      request?.username ||
+      "TimeSwap User"
+    );
+  };
+
+  const getUsername = (request) => {
+    const person = getPerson(request);
+
+    return (
+      person?.username ||
+      request?.username ||
+      "user"
+    );
+  };
+
+  const getProfilePicture = (request) => {
+    const person = getPerson(request);
+
+    return (
+      person?.profilePicture ||
+      person?.profileImage ||
+      person?.avatar ||
+      request?.profilePicture ||
+      request?.sender?.profilePicture ||
+      request?.receiver?.profilePicture ||
+      null
+    );
+  };
+
+  // =====================================================
+  // REQUEST DIRECTION
+  // =====================================================
+
+  const isIncomingRequest = (request) => {
+    if (!currentUser) return false;
+
+    const currentUserId =
+      currentUser?._id ||
+      currentUser?.id ||
+      currentUser?.userId;
+
+    const receiverId = getPersonId(request?.receiver);
+
+    const directReceiverId =
+      request?.receiverId ||
+      request?.receiver_id;
+
+    const targetReceiverId =
+      receiverId || directReceiverId;
+
+    return (
+      targetReceiverId &&
+      currentUserId &&
+      targetReceiverId.toString() === currentUserId.toString()
+    );
+  };
+
+  const isSentRequest = (request) => {
+    if (!currentUser) return false;
+
+    const currentUserId =
+      currentUser?._id ||
+      currentUser?.id ||
+      currentUser?.userId;
+
+    const senderId = getPersonId(request?.sender);
+
+    const directSenderId =
+      request?.senderId ||
+      request?.sender_id;
+
+    const targetSenderId =
+      senderId || directSenderId;
+
+    return (
+      targetSenderId &&
+      currentUserId &&
+      targetSenderId.toString() === currentUserId.toString()
+    );
+  };
+
+  // =====================================================
+  // COUNTS
+  // =====================================================
+
+  const counts = useMemo(() => {
+    return {
+      all: requests.length,
+
+      pending: requests.filter(
+        (request) => getStatus(request) === "pending"
+      ).length,
+
+      accepted: requests.filter(
+        (request) => getStatus(request) === "accepted"
+      ).length,
+
+      rejected: requests.filter((request) => {
+        const status = getStatus(request);
+
+        return (
+          status === "rejected" ||
+          status === "declined"
+        );
+      }).length,
+    };
+  }, [requests]);
+
+  // =====================================================
+  // FILTER REQUESTS
+  // =====================================================
+
+  const filteredRequests = useMemo(() => {
+    if (activeTab === "all") {
+      return requests;
+    }
+
+    return requests.filter((request) => {
+      const status = getStatus(request);
+
+      if (activeTab === "rejected") {
+        return (
+          status === "rejected" ||
+          status === "declined"
+        );
+      }
+
+      return status === activeTab;
+    });
+  }, [requests, activeTab]);
+
+  // =====================================================
+  // UPDATE REQUEST
+  // =====================================================
+
+  const updateRequest = async (requestId, status) => {
+    if (!requestId) return;
+
     try {
       setUpdatingId(requestId);
-      setError("");
 
       await api.put(
         `/swaps/request/${requestId}`,
-        {
-          status,
-        }
+        { status }
       );
 
-      // Update incoming requests
-      setIncomingRequests((previous) =>
+      setRequests((previous) =>
         previous.map((request) =>
-          request._id === requestId
+          getRequestId(request) === requestId
             ? {
                 ...request,
                 status,
@@ -84,492 +280,347 @@ function MySwaps() {
         )
       );
     } catch (error) {
-      console.error(error);
+      console.error(
+        "Failed to update swap request:",
+        error
+      );
 
-      setError(
-        error.response?.data?.message ||
-          "Couldn't update the request."
+      alert(
+        error?.response?.data?.message ||
+          "Could not update this request."
       );
     } finally {
       setUpdatingId(null);
     }
   };
 
-  /* -------------------------------- */
-  /* ACCEPTED REQUESTS */
-  /* -------------------------------- */
+  // =====================================================
+  // MESSAGE
+  // =====================================================
 
-  const acceptedRequests = [
-    ...incomingRequests,
-    ...sentRequests,
-  ].filter(
-    (request) =>
-      request.status?.toLowerCase() ===
-      "accepted"
-  );
+  const handleMessage = (request) => {
+    const currentUserId =
+      currentUser?._id ||
+      currentUser?.id ||
+      currentUser?.userId;
+
+    const senderId = getPersonId(request?.sender);
+    const receiverId = getPersonId(request?.receiver);
+
+    let otherUserId = null;
+
+    if (
+      currentUserId &&
+      senderId &&
+      senderId.toString() === currentUserId.toString()
+    ) {
+      otherUserId = receiverId;
+    } else {
+      otherUserId = senderId || receiverId;
+    }
+
+    if (otherUserId) {
+      navigate(`/messages?user=${otherUserId}`);
+    } else {
+      navigate("/messages");
+    }
+  };
+
+  // =====================================================
+  // INITIALS
+  // =====================================================
+
+  const getInitials = (name) => {
+    if (!name) return "U";
+
+    return name
+      .split(" ")
+      .filter(Boolean)
+      .map((word) => word[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+  };
+
+  // =====================================================
+  // RENDER
+  // =====================================================
 
   return (
-    <div className="min-h-screen bg-[#f7f4ee] text-[#292722]">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--text)] transition-colors duration-300">
+      <main className="mx-auto w-full max-w-[1200px] px-4 pb-12 pt-6 sm:px-6 lg:px-8">
 
-      {/* ============================================== */}
-      {/* NAVBAR */}
-      {/* ============================================== */}
+        {/* =================================================
+            HEADER
+        ================================================= */}
 
-      <header className="sticky top-0 z-50 border-b border-[#e5e0d8] bg-[#f7f4ee]/90 backdrop-blur-xl">
+        <section className="relative mb-6 overflow-hidden rounded-[26px] border border-[var(--border-light)] bg-[var(--surface)] p-5 shadow-[var(--shadow-sm)] sm:p-7">
 
-        <div className="mx-auto flex h-[70px] max-w-[1320px] items-center justify-between px-5 lg:px-8">
+          <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-[var(--pink-soft)] opacity-60 blur-3xl" />
 
-          {/* LOGO */}
+          <div className="pointer-events-none absolute -bottom-20 right-[30%] h-40 w-40 rounded-full bg-[var(--lavender-soft)] opacity-50 blur-3xl" />
 
-          <Link
-            to="/dashboard"
-            className="flex items-center gap-3"
-          >
+          <div className="relative">
 
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#292722] text-white">
-              <Sparkles size={15} />
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[var(--pink)] bg-[var(--pink-soft)] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-[var(--pink-strong)]">
+              <Sparkles size={12} />
+              Your skill exchanges
             </div>
 
-            <div>
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
 
-              <span className="block text-[16px] font-semibold tracking-[-0.03em]">
-                SkillSwap
-              </span>
+              <div>
+                <h1 className="text-[30px] font-bold leading-tight tracking-[-0.05em] sm:text-[38px]">
+                  My Swaps
+                </h1>
 
-              <span className="hidden text-[8px] uppercase tracking-[0.16em] text-[#aaa39a] sm:block">
-                Give an hour. Gain a skill.
-              </span>
+                <p className="mt-2 max-w-xl text-[11px] leading-5 text-[var(--text-secondary)]">
+                  Keep track of your skill exchanges,
+                  requests and new connections.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={fetchRequests}
+                disabled={loading}
+                className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-[13px] border border-[var(--border)] bg-[var(--surface-soft)] px-4 text-[10px] font-bold text-[var(--text)] transition hover:-translate-y-0.5 hover:border-[var(--pink)] hover:bg-[var(--pink-soft)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCw
+                  size={13}
+                  className={loading ? "animate-spin" : ""}
+                />
+                Refresh
+              </button>
 
             </div>
+          </div>
+        </section>
 
-          </Link>
+        {/* =================================================
+            QUICK STATS
+        ================================================= */}
 
+        <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
 
-          {/* NAVIGATION */}
+          <StatCard
+            icon={<Users size={15} />}
+            label="All requests"
+            value={counts.all}
+            color="pink"
+          />
 
-          <nav className="hidden items-center gap-8 md:flex">
+          <StatCard
+            icon={<Clock3 size={15} />}
+            label="Pending"
+            value={counts.pending}
+            color="yellow"
+          />
 
-            <NavItem
-              to="/dashboard"
-              text="Home"
+          <StatCard
+            icon={<CheckCircle2 size={15} />}
+            label="Accepted"
+            value={counts.accepted}
+            color="mint"
+          />
+
+          <StatCard
+            icon={<X size={15} />}
+            label="Declined"
+            value={counts.rejected}
+            color="peach"
+          />
+
+        </section>
+
+        {/* =================================================
+            TABS
+        ================================================= */}
+
+        <section className="mb-5">
+
+          <div className="flex w-full gap-2 overflow-x-auto rounded-[18px] border border-[var(--border-light)] bg-[var(--surface)] p-2 shadow-[var(--shadow-sm)]">
+
+            <FilterButton
+              active={activeTab === "all"}
+              onClick={() => setActiveTab("all")}
+              label="All"
+              count={counts.all}
             />
 
-            <NavItem
-              to="/explore"
-              text="Explore"
+            <FilterButton
+              active={activeTab === "pending"}
+              onClick={() => setActiveTab("pending")}
+              label="Pending"
+              count={counts.pending}
             />
 
-            <NavItem
-              to="/swaps"
-              text="My swaps"
-              active
+            <FilterButton
+              active={activeTab === "accepted"}
+              onClick={() => setActiveTab("accepted")}
+              label="Accepted"
+              count={counts.accepted}
             />
 
-            <NavItem
-              to="/messages"
-              text="Messages"
+            <FilterButton
+              active={activeTab === "rejected"}
+              onClick={() => setActiveTab("rejected")}
+              label="Declined"
+              count={counts.rejected}
             />
 
-          </nav>
+          </div>
+        </section>
 
+        {/* =================================================
+            SECTION TITLE
+        ================================================= */}
 
-          {/* PROFILE */}
+        <div className="mb-4 flex items-center justify-between">
 
-          <Link
-            to="/profile"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#ddd4e7] text-xs font-semibold transition hover:scale-105"
-          >
-            {user?.name
-              ?.charAt(0)
-              ?.toUpperCase() || "U"}
-          </Link>
+          <div>
+            <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-[var(--pink-strong)]">
+              Activity
+            </p>
+
+            <h2 className="mt-1 text-[20px] font-bold tracking-[-0.04em]">
+              Swap requests
+            </h2>
+          </div>
+
+          <div className="rounded-full bg-[var(--lavender-soft)] px-3 py-1.5 text-[9px] font-bold text-[var(--purple-strong)]">
+            {filteredRequests.length} shown
+          </div>
 
         </div>
 
-      </header>
+        {/* =================================================
+            CONTENT
+        ================================================= */}
 
-
-      {/* ============================================== */}
-      {/* MAIN */}
-      {/* ============================================== */}
-
-      <main className="mx-auto max-w-[1200px] px-5 py-8 sm:px-8 lg:py-10">
-
-        {/* BACK */}
-
-        <Link
-          to="/dashboard"
-          className="inline-flex items-center gap-2 text-[10px] text-[#8e887f] transition hover:text-[#292722]"
-        >
-          <ArrowLeft size={13} />
-          Back home
-        </Link>
-
-
-        {/* ============================================== */}
-        {/* HERO */}
-        {/* ============================================== */}
-
-        <section className="mt-6 grid overflow-hidden rounded-[28px] bg-[#ddd5e8] lg:grid-cols-[1fr_300px]">
-
-          {/* HERO TEXT */}
-
-          <div className="px-6 py-9 sm:px-10 sm:py-11">
-
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#eee9f2] px-3 py-1.5 text-[9px] font-medium text-[#6d6473]">
-
-              <Sparkles size={11} />
-
-              Your exchanges
-
-            </div>
-
-
-            <h1 className="mt-5 text-[38px] font-semibold leading-[0.98] tracking-[-0.06em] sm:text-[52px]">
-
-              My swaps.
-
-              <br />
-
-              Learn. Share. Connect.
-
-            </h1>
-
-
-            <p className="mt-5 max-w-[500px] text-[12px] leading-6 text-[#706974] sm:text-[13px]">
-
-              Keep track of the people you're
-              learning from, teaching, and
-              connecting with.
-
-            </p>
-
-          </div>
-
-
-          {/* HERO STATS */}
-
-          <div className="relative hidden overflow-hidden lg:block">
-
-            <div className="absolute -right-16 -top-16 h-[250px] w-[250px] rounded-full border-[25px] border-[#eeeaf3]/70" />
-
-            <div className="absolute right-8 top-20 h-[150px] w-[150px] rounded-full border-[16px] border-[#cfc4dc]/70" />
-
-
-            <div className="absolute right-10 bottom-9 w-[205px] rounded-[20px] bg-[#fffdf9] p-5 shadow-[0_18px_40px_rgba(0,0,0,0.07)]">
-
-              <div className="flex items-center justify-between">
-
-                <span className="text-[8px] uppercase tracking-[0.16em] text-[#aaa39a]">
-                  Active swaps
-                </span>
-
-                <Users size={13} />
-
-              </div>
-
-
-              <p className="mt-3 text-[32px] font-semibold tracking-[-0.05em]">
-                {acceptedRequests.length}
-              </p>
-
-              <p className="text-[9px] text-[#99938a]">
-                connections in progress
-              </p>
-
-            </div>
-
-          </div>
-
-        </section>
-
-
-        {/* ============================================== */}
-        {/* QUICK STATS */}
-        {/* ============================================== */}
-
-        <section className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
-
-          <MiniStat
-            value={incomingRequests.length}
-            label="Incoming"
-            className="bg-[#f0df91]"
+        {loading ? (
+          <LoadingState />
+        ) : filteredRequests.length === 0 ? (
+          <EmptyState
+            activeTab={activeTab}
+            goExplore={() => navigate("/explore")}
           />
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-2">
 
-          <MiniStat
-            value={sentRequests.length}
-            label="Sent"
-            className="bg-[#e8b6d5]"
-          />
+            {filteredRequests.map((request) => {
+              const requestId = getRequestId(request);
+              const incoming = isIncomingRequest(request);
+              const sent = isSentRequest(request);
 
-          <MiniStat
-            value={acceptedRequests.length}
-            label="Active"
-            className="bg-[#dde5d2]"
-          />
+              return (
+                <SwapRequestCard
+                  key={requestId}
+                  request={request}
+                  name={getName(request)}
+                  username={getUsername(request)}
+                  profilePicture={getProfilePicture(request)}
+                  initials={getInitials(getName(request))}
+                  updating={updatingId === requestId}
+                  isIncoming={incoming}
+                  isSent={sent}
+                  onAccept={() =>
+                    updateRequest(requestId, "accepted")
+                  }
+                  onReject={() =>
+                    updateRequest(requestId, "rejected")
+                  }
+                  onMessage={() =>
+                    handleMessage(request)
+                  }
+                />
+              );
+            })}
 
-        </section>
-
-
-        {/* ============================================== */}
-        {/* ERROR */}
-        {/* ============================================== */}
-
-        {error && (
-          <div className="mt-5 rounded-2xl border border-[#ead8d5] bg-[#f8eae7] px-5 py-4 text-[11px] text-[#8b625c]">
-            {error}
           </div>
         )}
 
-
-        {/* ============================================== */}
-        {/* ACTIVE SWAPS */}
-        {/* ============================================== */}
-
-        {acceptedRequests.length > 0 &&
-          !loading && (
-
-            <section className="mt-10">
-
-              <SectionHeading
-                eyebrow="Currently learning"
-                title="Active swaps"
-                count={acceptedRequests.length}
-              />
-
-              <div className="mt-5 grid gap-3 md:grid-cols-2">
-
-                {acceptedRequests.map(
-                  (request) => (
-                    <ActiveSwapCard
-                      key={request._id}
-                      request={request}
-                      user={user}
-                    />
-                  )
-                )}
-
-              </div>
-
-            </section>
-
-          )}
-
-
-        {/* ============================================== */}
-        {/* REQUESTS */}
-        {/* ============================================== */}
-
-        <section className="mt-10 grid gap-8 lg:grid-cols-2">
-
-
-          {/* INCOMING */}
-
-          <section>
-
-            <SectionHeading
-              eyebrow="People reaching out"
-              title="Incoming"
-              count={incomingRequests.length}
-            />
-
-            <div className="mt-5">
-
-              {loading ? (
-
-                <LoadingCards />
-
-              ) : incomingRequests.length === 0 ? (
-
-                <EmptyState
-                  icon={<Users size={16} />}
-                  title="No requests yet"
-                  text="When someone wants to exchange skills with you, they'll appear here."
-                />
-
-              ) : (
-
-                <div className="space-y-3">
-
-                  {incomingRequests.map(
-                    (request) => (
-
-                      <RequestCard
-                        key={request._id}
-                        request={request}
-                        type="incoming"
-                        updating={
-                          updatingId ===
-                          request._id
-                        }
-                        onUpdate={
-                          updateRequest
-                        }
-                      />
-
-                    )
-                  )}
-
-                </div>
-
-              )}
-
-            </div>
-
-          </section>
-
-
-          {/* SENT */}
-
-          <section>
-
-            <SectionHeading
-              eyebrow="People you're waiting on"
-              title="Sent"
-              count={sentRequests.length}
-            />
-
-            <div className="mt-5">
-
-              {loading ? (
-
-                <LoadingCards />
-
-              ) : sentRequests.length === 0 ? (
-
-                <EmptyState
-                  icon={<Sparkles size={16} />}
-                  title="Nothing sent yet"
-                  text="Find someone interesting in Explore and start your first skill exchange."
-                  action={
-                    <Link
-                      to="/explore"
-                      className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#292722] px-5 py-2.5 text-[10px] text-white"
-                    >
-                      Explore people
-                      <ArrowRight size={12} />
-                    </Link>
-                  }
-                />
-
-              ) : (
-
-                <div className="space-y-3">
-
-                  {sentRequests.map(
-                    (request) => (
-
-                      <RequestCard
-                        key={request._id}
-                        request={request}
-                        type="sent"
-                        updating={
-                          updatingId ===
-                          request._id
-                        }
-                        onUpdate={
-                          updateRequest
-                        }
-                      />
-
-                    )
-                  )}
-
-                </div>
-
-              )}
-
-            </div>
-
-          </section>
-
-        </section>
-
-
-        {/* ============================================== */}
-        {/* BOTTOM CTA */}
-        {/* ============================================== */}
-
-        <section className="mt-10 rounded-[24px] bg-[#292722] px-6 py-7 text-white sm:px-8">
-
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-
-            <div>
-
-              <p className="text-[8px] uppercase tracking-[0.2em] text-[#aaa59d]">
-                Ready for your next exchange?
-              </p>
-
-              <h2 className="mt-2 text-[21px] font-medium tracking-[-0.035em]">
-                Someone out there knows
-                something you want to learn.
-              </h2>
-
-            </div>
-
-
-            <Link
-              to="/explore"
-              className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-5 py-3 text-[10px] font-medium text-[#292722] transition hover:-translate-y-0.5"
-            >
-              Find them
-              <ArrowUpRight size={13} />
-            </Link>
-
-          </div>
-
-        </section>
-
       </main>
-
     </div>
   );
 }
 
+// =====================================================
+// STAT CARD
+// =====================================================
 
-/* ================================================= */
-/* NAV ITEM */
-/* ================================================= */
-
-function NavItem({
-  to,
-  text,
-  active,
-}) {
-  return (
-    <Link
-      to={to}
-      className={`text-[12px] transition ${
-        active
-          ? "font-medium text-[#292722]"
-          : "text-[#89837b] hover:text-[#292722]"
-      }`}
-    >
-      {text}
-    </Link>
-  );
-}
-
-
-/* ================================================= */
-/* MINI STAT */
-/* ================================================= */
-
-function MiniStat({
-  value,
+function StatCard({
+  icon,
   label,
-  className,
+  value,
+  color,
 }) {
+  const colors = {
+    pink: {
+      bg: "bg-[var(--pink-soft)]",
+      icon: "bg-[var(--pink)]",
+      text: "text-[var(--pink-strong)]",
+    },
+
+    yellow: {
+      bg: "bg-[var(--yellow-soft)]",
+      icon: "bg-[var(--yellow)]",
+      text: "text-[var(--yellow-dark)]",
+    },
+
+    mint: {
+      bg: "bg-[var(--mint-soft)]",
+      icon: "bg-[var(--mint)]",
+      text: "text-[var(--green-strong)]",
+    },
+
+    peach: {
+      bg: "bg-[var(--peach-soft)]",
+      icon: "bg-[var(--peach)]",
+      text: "text-[var(--peach-dark)]",
+    },
+  };
+
+  const selected = colors[color] || colors.pink;
+
   return (
     <div
-      className={`rounded-[20px] p-5 ${className}`}
+      className={`
+        ${selected.bg}
+        rounded-[20px]
+        border
+        border-[var(--border-light)]
+        p-3.5
+        shadow-[var(--shadow-sm)]
+        transition
+        hover:-translate-y-0.5
+      `}
     >
 
-      <p className="text-[27px] font-semibold tracking-[-0.05em]">
-        {value}
-      </p>
+      <div className="flex items-center justify-between">
 
-      <p className="mt-1 text-[9px] uppercase tracking-[0.14em] opacity-60">
+        <div
+          className={`
+            flex
+            h-8
+            w-8
+            items-center
+            justify-center
+            rounded-[11px]
+            ${selected.icon}
+            ${selected.text}
+          `}
+        >
+          {icon}
+        </div>
+
+        <span className="text-[20px] font-bold tracking-[-0.04em] text-[var(--text)]">
+          {value}
+        </span>
+
+      </div>
+
+      <p className="mt-2 text-[8px] font-bold uppercase tracking-[0.08em] text-[var(--text-secondary)]">
         {label}
       </p>
 
@@ -577,495 +628,428 @@ function MiniStat({
   );
 }
 
+// =====================================================
+// FILTER BUTTON
+// =====================================================
 
-/* ================================================= */
-/* SECTION HEADING */
-/* ================================================= */
-
-function SectionHeading({
-  eyebrow,
-  title,
+function FilterButton({
+  active,
+  onClick,
+  label,
   count,
 }) {
   return (
-    <div className="flex items-end justify-between">
+    <button
+      type="button"
+      onClick={onClick}
+      className={`
+        flex
+        shrink-0
+        items-center
+        gap-2
+        rounded-[12px]
+        px-3.5
+        py-2
+        text-[9px]
+        font-bold
+        transition
+        ${
+          active
+            ? "bg-[var(--purple)] text-white shadow-[var(--shadow-sm)]"
+            : "text-[var(--text-secondary)] hover:bg-[var(--surface-soft)] hover:text-[var(--text)]"
+        }
+      `}
+    >
 
-      <div>
+      {label}
 
-        <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[#aaa39a]">
-          {eyebrow}
-        </p>
-
-        <h2 className="mt-1 text-[25px] font-semibold tracking-[-0.045em]">
-          {title}
-        </h2>
-
-      </div>
-
-
-      <span className="rounded-full bg-[#fffdf9] px-3 py-1.5 text-[9px] font-semibold text-[#777168]">
+      <span
+        className={`
+          rounded-full
+          px-1.5
+          py-0.5
+          text-[8px]
+          ${
+            active
+              ? "bg-white/20 text-white"
+              : "bg-[var(--surface-soft)] text-[var(--text-muted)]"
+          }
+        `}
+      >
         {count}
       </span>
 
-    </div>
+    </button>
   );
 }
 
+// =====================================================
+// REQUEST CARD
+// =====================================================
 
-/* ================================================= */
-/* REQUEST CARD */
-/* ================================================= */
-
-function RequestCard({
+function SwapRequestCard({
   request,
-  type,
+  name,
+  username,
+  profilePicture,
+  initials,
   updating,
-  onUpdate,
+  isIncoming,
+  isSent,
+  onAccept,
+  onReject,
+  onMessage,
 }) {
+  const status = (
+    request?.status ||
+    request?.requestStatus ||
+    "pending"
+  ).toLowerCase();
 
-  const person =
-    type === "incoming"
-      ? request.sender
-      : request.receiver;
+  const skill =
+    request?.skill ||
+    request?.skillTheyTeach ||
+    request?.teachSkill ||
+    request?.requestedSkill ||
+    "Skill exchange";
 
+  const wantedSkill =
+    request?.skillTheyWant ||
+    request?.wantSkill ||
+    request?.learningSkill ||
+    request?.offeredSkill ||
+    "Your skills";
 
-  const name =
-    person?.name ||
-    request.name ||
-    "SkillSwap user";
+  const message =
+    request?.message ||
+    "I'd love to exchange skills with you!";
 
+  const isPending = status === "pending";
 
-  const username =
-    person?.username || "";
+  const isAccepted = status === "accepted";
 
-
-  const initial =
-    name.charAt(0).toUpperCase();
-
-
-  const status =
-    request.status?.toLowerCase() ||
-    "pending";
-
-
-  /*
-   * Find the other person's ID.
-   * This is used to open their exact conversation.
-   */
-
-  const otherUserId =
-    type === "incoming"
-      ? request.sender?._id
-      : request.receiver?._id;
-
+  const isRejected =
+    status === "rejected" ||
+    status === "declined";
 
   return (
-    <article className="group rounded-[22px] border border-[#e2ddd5] bg-[#fffdf9] p-5 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_35px_rgba(0,0,0,0.05)]">
+    <article className="overflow-hidden rounded-[23px] border border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow-sm)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]">
 
+      {/* TOP COLOUR STRIP */}
 
-      {/* TOP */}
+      <div
+        className={`
+          h-2
+          ${
+            isAccepted
+              ? "bg-[var(--mint)]"
+              : isRejected
+              ? "bg-[var(--peach)]"
+              : "bg-[var(--pink)]"
+          }
+        `}
+      />
 
-      <div className="flex items-start justify-between gap-4">
+      <div className="p-4 sm:p-5">
 
-        <div className="flex items-center gap-3">
+        {/* PERSON */}
 
-          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#e8ddea] text-xs font-semibold">
-            {initial}
-          </div>
+        <div className="flex items-center justify-between gap-3">
 
-          <div>
+          <div className="flex min-w-0 items-center gap-3">
 
-            <h3 className="text-[14px] font-semibold">
-              {name}
-            </h3>
-
-            {username && (
-              <p className="mt-0.5 text-[9px] text-[#aaa39a]">
-                @{username}
-              </p>
+            {profilePicture ? (
+              <img
+                src={profilePicture}
+                alt=""
+                className="h-11 w-11 shrink-0 rounded-[14px] border-2 border-[var(--border-light)] object-cover"
+              />
+            ) : (
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-[var(--lavender)] text-sm font-bold text-[var(--purple-dark)]">
+                {initials}
+              </div>
             )}
 
+            <div className="min-w-0">
+
+              <h3 className="truncate text-[13px] font-bold text-[var(--text)]">
+                {name}
+              </h3>
+
+              <p className="mt-0.5 truncate text-[9px] text-[var(--text-muted)]">
+                @{username}
+              </p>
+
+            </div>
+          </div>
+
+          <StatusBadge status={status} />
+
+        </div>
+
+        {/* REQUEST TYPE */}
+
+        <div className="mt-4 rounded-[15px] bg-[var(--surface-soft)] px-3 py-2">
+
+          <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+            {isIncoming
+              ? "Incoming request"
+              : isSent
+              ? "Sent request"
+              : "Skill exchange"}
+          </p>
+
+        </div>
+
+        {/* SKILL EXCHANGE */}
+
+        <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+
+          <div className="rounded-[16px] border border-[var(--border-light)] bg-[var(--peach-soft)] p-3">
+
+            <p className="text-[8px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
+              They offer
+            </p>
+
+            <p className="mt-1 truncate text-[12px] font-semibold text-[var(--text)]">
+              {skill}
+            </p>
+
+          </div>
+
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--surface)] text-[var(--text-secondary)] shadow-sm">
+            <ArrowRight size={12} />
+          </div>
+
+          <div className="rounded-[16px] border border-[var(--border-light)] bg-[var(--mint-soft)] p-3">
+
+            <p className="text-[8px] uppercase tracking-[0.16em] text-[var(--text-muted)]">
+              They want
+            </p>
+
+            <p className="mt-1 truncate text-[12px] font-semibold text-[var(--text)]">
+              {wantedSkill}
+            </p>
+
           </div>
 
         </div>
 
+        {/* MESSAGE */}
 
-        <StatusBadge status={status} />
+        {message && (
+          <div className="mt-4 rounded-[15px] border border-[var(--border-light)] bg-[var(--surface-soft)] px-3 py-2.5">
 
-      </div>
+            <div className="flex items-start gap-2">
 
+              <MessageCircle
+                size={12}
+                className="mt-0.5 shrink-0 text-[var(--purple-strong)]"
+              />
 
-      {/* EXCHANGE */}
-
-      <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-[18px] bg-[#f7f4ee] p-4">
-
-        <div>
-
-          <p className="text-[8px] uppercase tracking-[0.16em] text-[#aaa39a]">
-            {type === "incoming"
-              ? "They teach"
-              : "They want"}
-          </p>
-
-          <p className="mt-1 text-[12px] font-semibold">
-            {request.skillTheyTeach ||
-              "A new skill"}
-          </p>
-
-        </div>
-
-
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white">
-          <ArrowRight size={12} />
-        </div>
-
-
-        <div className="text-right">
-
-          <p className="text-[8px] uppercase tracking-[0.16em] text-[#aaa39a]">
-            {type === "incoming"
-              ? "You offer"
-              : "You teach"}
-          </p>
-
-          <p className="mt-1 text-[12px] font-semibold">
-            {request.skillTheyWant ||
-              "Your skill"}
-          </p>
-
-        </div>
-
-      </div>
-
-
-      {/* MESSAGE */}
-
-      {request.message && (
-        <div className="mt-4">
-
-          <p className="text-[10px] leading-5 text-[#777168]">
-            "{request.message}"
-          </p>
-
-        </div>
-      )}
-
-
-      {/* INCOMING ACTIONS */}
-
-      {type === "incoming" &&
-        status === "pending" && (
-
-          <div className="mt-5 grid grid-cols-2 gap-2">
-
-            <button
-              onClick={() =>
-                onUpdate(
-                  request._id,
-                  "accepted"
-                )
-              }
-              disabled={updating}
-              className="flex items-center justify-center gap-2 rounded-xl bg-[#292722] py-3 text-[10px] font-medium text-white transition hover:bg-[#3c3934] disabled:opacity-50"
-            >
-
-              <Check size={13} />
-
-              {updating
-                ? "Updating..."
-                : "Accept swap"}
-
-            </button>
-
-
-            <button
-              onClick={() =>
-                onUpdate(
-                  request._id,
-                  "rejected"
-                )
-              }
-              disabled={updating}
-              className="flex items-center justify-center gap-2 rounded-xl border border-[#ded8cf] py-3 text-[10px] font-medium transition hover:bg-[#f7f4ee] disabled:opacity-50"
-            >
-
-              <X size={13} />
-
-              Decline
-
-            </button>
-
-          </div>
-
-        )}
-
-
-      {/* SENT */}
-
-      {type === "sent" &&
-        status === "pending" && (
-
-          <div className="mt-5 flex items-center gap-2 rounded-xl bg-[#eee8df] px-4 py-3 text-[10px] text-[#888178]">
-
-            <Clock3 size={13} />
-
-            Waiting for their response...
-
-          </div>
-
-        )}
-
-
-      {/* ACCEPTED */}
-
-      {status === "accepted" &&
-        otherUserId && (
-
-          <Link
-            to={`/messages?user=${otherUserId}`}
-            className="mt-5 flex items-center justify-between rounded-xl bg-[#dde5d2] px-4 py-3 transition hover:bg-[#d4ddc8]"
-          >
-
-            <div className="flex items-center gap-2">
-
-              <MessageCircle size={13} />
-
-              <span className="text-[10px] font-medium">
-                Your swap is active
-              </span>
+              <p className="text-[10px] leading-5 text-[var(--text-secondary)]">
+                “{message}”
+              </p>
 
             </div>
 
-
-            <ArrowUpRight size={13} />
-
-          </Link>
-
+          </div>
         )}
 
+        {/* ACTIONS */}
+
+        <div className="mt-4 flex gap-2">
+
+          {isPending && isIncoming ? (
+            <>
+              <button
+                type="button"
+                disabled={updating}
+                onClick={onAccept}
+                className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-[12px] bg-[var(--green-strong)] px-3 text-[9px] font-bold text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Check size={13} />
+
+                {updating
+                  ? "Updating..."
+                  : "Accept"}
+              </button>
+
+              <button
+                type="button"
+                disabled={updating}
+                onClick={onReject}
+                className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface-soft)] px-3 text-[9px] font-bold text-[var(--text-secondary)] transition hover:bg-[var(--peach-soft)] hover:text-[var(--peach-dark)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <X size={13} />
+                Decline
+              </button>
+            </>
+          ) : isAccepted ? (
+            <button
+              type="button"
+              onClick={onMessage}
+              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-[12px] bg-[var(--purple)] px-3 text-[9px] font-bold text-white transition hover:-translate-y-0.5 hover:bg-[var(--purple-strong)]"
+            >
+              <MessageCircle size={13} />
+              Message
+              <ArrowRight size={12} />
+            </button>
+          ) : isPending && isSent ? (
+            <div className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-[12px] bg-[var(--yellow-soft)] px-3 text-[9px] font-bold text-[var(--yellow-dark)]">
+              <Clock3 size={13} />
+              Waiting for response
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onMessage}
+              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-[12px] bg-[var(--purple)] px-3 text-[9px] font-bold text-white transition hover:-translate-y-0.5 hover:bg-[var(--purple-strong)]"
+            >
+              <MessageCircle size={13} />
+              Message
+              <ArrowRight size={12} />
+            </button>
+          )}
+
+        </div>
+
+      </div>
     </article>
   );
 }
 
+// =====================================================
+// STATUS BADGE
+// =====================================================
 
-/* ================================================= */
-/* ACTIVE SWAP CARD */
-/* ================================================= */
-
-function ActiveSwapCard({
-  request,
-  user,
-}) {
-
-  /*
-   * Compare IDs as strings.
-   * This prevents ObjectId/string comparison issues.
-   */
-
-  const senderId =
-    request.sender?._id?.toString();
-
-  const currentUserId =
-    user?._id?.toString();
-
-
-  const isSender =
-    senderId === currentUserId;
-
-
-  const person =
-    isSender
-      ? request.receiver
-      : request.sender;
-
-
-  const name =
-    person?.name ||
-    "SkillSwap user";
-
-
-  const initial =
-    name.charAt(0).toUpperCase();
-
-
-  const otherUserId =
-    person?._id;
-
-
-  return (
-    <Link
-      to={
-        otherUserId
-          ? `/messages?user=${otherUserId}`
-          : "/messages"
-      }
-      className="group rounded-[22px] border border-[#ded8cf] bg-[#dde5d2] p-5 transition hover:-translate-y-1 hover:shadow-[0_14px_35px_rgba(0,0,0,0.05)]"
-    >
-
-      {/* TOP */}
-
-      <div className="flex items-start justify-between">
-
-        <div className="flex items-center gap-3">
-
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/70 text-xs font-semibold">
-            {initial}
-          </div>
-
-          <div>
-
-            <p className="text-[8px] uppercase tracking-[0.16em] text-[#78816d]">
-              Active exchange
-            </p>
-
-            <h3 className="mt-1 text-[14px] font-semibold">
-              {name}
-            </h3>
-
-          </div>
-
-        </div>
-
-
-        <ArrowUpRight
-          size={14}
-          className="text-[#59604f] transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-        />
-
-      </div>
-
-
-      {/* SKILLS */}
-
-      <div className="mt-5 flex items-center gap-2">
-
-        <span className="rounded-full bg-white/70 px-3 py-1.5 text-[9px]">
-          {request.skillTheyTeach ||
-            "Skill exchange"}
-        </span>
-
-        <span className="text-[10px] text-[#78816d]">
-          ↔
-        </span>
-
-        <span className="rounded-full bg-white/70 px-3 py-1.5 text-[9px]">
-          {request.skillTheyWant ||
-            "Your skills"}
-        </span>
-
-      </div>
-
-
-      {/* CHAT */}
-
-      <div className="mt-5 flex items-center gap-2 text-[9px] text-[#59604f]">
-
-        <MessageCircle size={12} />
-
-        Continue conversation
-
-      </div>
-
-    </Link>
-  );
-}
-
-
-/* ================================================= */
-/* STATUS */
-/* ================================================= */
-
-function StatusBadge({
-  status,
-}) {
-
+function StatusBadge({ status }) {
   if (status === "accepted") {
-
     return (
-      <span className="rounded-full bg-[#dde5d2] px-3 py-1.5 text-[9px] font-semibold text-[#59604f]">
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--mint-soft)] px-2.5 py-1.5 text-[8px] font-bold text-[var(--green-strong)]">
+        <CheckCircle2 size={11} />
         Accepted
       </span>
     );
-
   }
 
-
-  if (status === "rejected") {
-
+  if (
+    status === "rejected" ||
+    status === "declined"
+  ) {
     return (
-      <span className="rounded-full bg-[#f0e5e3] px-3 py-1.5 text-[9px] font-semibold text-[#8a625d]">
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--peach-soft)] px-2.5 py-1.5 text-[8px] font-bold text-[var(--peach-dark)]">
+        <X size={11} />
         Declined
       </span>
     );
-
   }
 
-
   return (
-    <span className="rounded-full bg-[#eee7f1] px-3 py-1.5 text-[9px] font-semibold text-[#675d6d]">
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--yellow-soft)] px-2.5 py-1.5 text-[8px] font-bold text-[var(--yellow-dark)]">
+      <Clock3 size={11} />
       Pending
     </span>
   );
 }
 
+// =====================================================
+// LOADING STATE
+// =====================================================
 
-/* ================================================= */
-/* EMPTY */
-/* ================================================= */
-
-function EmptyState({
-  icon,
-  title,
-  text,
-  action,
-}) {
-
+function LoadingState() {
   return (
-    <div className="rounded-[22px] border border-[#e2ddd5] bg-[#fffdf9] px-6 py-12 text-center">
+    <div className="grid gap-4 lg:grid-cols-2">
 
-      <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#eee8df]">
-        {icon}
-      </div>
-
-
-      <h3 className="mt-4 text-[14px] font-semibold">
-        {title}
-      </h3>
-
-
-      <p className="mx-auto mt-2 max-w-xs text-[10px] leading-5 text-[#99938a]">
-        {text}
-      </p>
-
-
-      {action}
-
-    </div>
-  );
-}
-
-
-/* ================================================= */
-/* LOADING */
-/* ================================================= */
-
-function LoadingCards() {
-
-  return (
-    <div className="space-y-3">
-
-      {[1, 2].map((item) => (
-
+      {[1, 2, 3, 4].map((item) => (
         <div
           key={item}
-          className="h-[225px] animate-pulse rounded-[22px] bg-[#eeeae3]"
-        />
+          className="overflow-hidden rounded-[23px] border border-[var(--border-light)] bg-[var(--card)]"
+        >
 
+          <div className="h-2 bg-[var(--pink-soft)]" />
+
+          <div className="space-y-4 p-5">
+
+            <div className="flex items-center gap-3">
+
+              <div className="h-11 w-11 animate-pulse rounded-[14px] bg-[var(--surface-soft)]" />
+
+              <div className="space-y-2">
+
+                <div className="h-3 w-28 animate-pulse rounded bg-[var(--surface-soft)]" />
+
+                <div className="h-2 w-20 animate-pulse rounded bg-[var(--surface-soft)]" />
+
+              </div>
+
+            </div>
+
+            <div className="h-7 w-28 animate-pulse rounded-[12px] bg-[var(--surface-soft)]" />
+
+            <div className="grid grid-cols-2 gap-2">
+
+              <div className="h-20 animate-pulse rounded-[16px] bg-[var(--peach-soft)]" />
+
+              <div className="h-20 animate-pulse rounded-[16px] bg-[var(--mint-soft)]" />
+
+            </div>
+
+            <div className="h-14 animate-pulse rounded-[15px] bg-[var(--surface-soft)]" />
+
+            <div className="h-9 animate-pulse rounded-[12px] bg-[var(--surface-soft)]" />
+
+          </div>
+        </div>
       ))}
 
     </div>
   );
 }
 
+// =====================================================
+// EMPTY STATE
+// =====================================================
+
+function EmptyState({
+  activeTab,
+  goExplore,
+}) {
+  const title =
+    activeTab === "all"
+      ? "No swap requests yet"
+      : activeTab === "rejected"
+      ? "No declined requests"
+      : `No ${activeTab} requests`;
+
+  return (
+    <div className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] px-6 py-14 text-center shadow-[var(--shadow-sm)]">
+
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-[var(--lavender-soft)] text-[var(--purple-strong)]">
+        <Inbox size={24} />
+      </div>
+
+      <h3 className="mt-4 text-[18px] font-bold">
+        {title}
+      </h3>
+
+      <p className="mx-auto mt-2 max-w-sm text-[10px] leading-5 text-[var(--text-secondary)]">
+        Start exploring the TimeSwap community
+        and find someone whose skills match yours.
+      </p>
+
+      <button
+        type="button"
+        onClick={goExplore}
+        className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-[13px] bg-[var(--purple)] px-5 text-[9px] font-bold text-white transition hover:-translate-y-0.5 hover:bg-[var(--purple-strong)]"
+      >
+        Explore people
+        <ArrowRight size={13} />
+      </button>
+
+    </div>
+  );
+}
 
 export default MySwaps;
+

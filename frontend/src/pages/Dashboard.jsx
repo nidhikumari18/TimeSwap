@@ -1,512 +1,1242 @@
 import { useEffect, useState } from "react";
+
 import {
   ArrowRight,
-  ArrowUpRight,
   BookOpen,
-  ChevronRight,
+  Coins,
   Heart,
   MessageCircle,
+  Repeat2,
   Sparkles,
+  Star,
   Users,
+  Zap,
+  Plus,
+  Compass,
+  Clock3,
 } from "lucide-react";
+
 import { Link } from "react-router-dom";
 
-import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import api from "../services/api";
+
 
 function Dashboard() {
   const { user } = useAuth();
 
-  const [matches, setMatches] = useState([]);
+  const [stats, setStats] = useState({
+    activeSwaps: 0,
+    completedSwaps: 0,
+    peopleConnected: 0,
+  });
+
   const [loading, setLoading] = useState(true);
 
+
+  /* =========================================================
+     LOAD DASHBOARD DATA
+  ========================================================= */
+
   useEffect(() => {
-    loadMatches();
-  }, []);
+    if (!user?._id) return;
 
-  const loadMatches = async () => {
+    loadDashboard();
+  }, [user?._id]);
+
+
+  const loadDashboard = async () => {
     try {
-      const response = await api.get("/users/matches");
+      setLoading(true);
 
-      const data = response.data;
+      const response = await api.get("/swaps/request/status");
 
-      const people =
-        data.users ||
-        data.matches ||
-        data ||
-        [];
+      const requests = response.data.requests || [];
 
-      setMatches(
-        Array.isArray(people)
-          ? people
-              .filter(
-                (person) =>
-                  person._id !== user?._id
-              )
-              .slice(0, 4)
-          : []
+      const accepted = requests.filter(
+        (request) => request.status === "accepted"
       );
+
+      setStats({
+        activeSwaps: accepted.length,
+        completedSwaps: 0,
+
+        peopleConnected: new Set(
+          accepted.flatMap((request) => [
+            request.sender?._id,
+            request.receiver?._id,
+          ])
+        ).size,
+      });
+
     } catch (error) {
-      console.error(error);
+      console.error("Dashboard loading error:", error);
+
     } finally {
       setLoading(false);
     }
   };
 
+
+  /* =========================================================
+     USER DATA
+  ========================================================= */
+
   const firstName =
     user?.name?.split(" ")[0] || "there";
 
-  const teaching =
+  const credits = user?.credits ?? 0;
+  const earned = user?.totalCreditsEarned ?? 0;
+  const spent = user?.totalCreditsSpent ?? 0;
+
+  const teachSkills =
     user?.skillsToTeach || [];
 
-  const learning =
+  const learnSkills =
     user?.skillsToLearn || [];
 
 
+  /* =========================================================
+     INITIALS
+  ========================================================= */
+
+  const getInitials = (name) => {
+    if (!name) return "U";
+
+    return name
+      .split(" ")
+      .map((word) => word[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+  };
+
+
+  /* =========================================================
+     PROFILE PROGRESS
+  ========================================================= */
+
+  const profileProgress =
+    teachSkills.length && learnSkills.length
+      ? "85%"
+      : teachSkills.length || learnSkills.length
+      ? "55%"
+      : "25%";
+
+
   return (
-    <div className="min-h-screen bg-[#f7f4ee] text-[#292722]">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--text)]">
 
-      {/* ================================================= */}
-      {/* NAVBAR */}
-      {/* ================================================= */}
-
-      <header className="sticky top-0 z-50 border-b border-[#e5e0d8] bg-[#f7f4ee]/90 backdrop-blur-xl">
-
-        <div className="mx-auto flex h-[70px] max-w-[1320px] items-center justify-between px-5 lg:px-8">
-
-          {/* LOGO */}
-
-          <Link
-            to="/dashboard"
-            className="flex items-center gap-3"
-          >
-
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#292722] text-white">
-              <Sparkles size={15} />
-            </div>
-
-            <div>
-              <span className="block text-[16px] font-semibold tracking-[-0.03em]">
-                SkillSwap
-              </span>
-
-              <span className="hidden text-[8px] uppercase tracking-[0.16em] text-[#aaa39a] sm:block">
-                Give an hour. Gain a skill.
-              </span>
-            </div>
-
-          </Link>
+      
 
 
-          {/* NAVIGATION */}
-
-          <nav className="hidden items-center gap-8 md:flex">
-
-            <NavItem
-              to="/dashboard"
-              text="Home"
-              active
-            />
-
-            <NavItem
-              to="/explore"
-              text="Explore"
-            />
-
-            <NavItem
-              to="/swaps"
-              text="My swaps"
-            />
-
-            <NavItem
-              to="/messages"
-              text="Messages"
-            />
-
-          </nav>
+      <main className="mx-auto max-w-[1380px] px-4 py-6 sm:px-6 lg:px-8">
 
 
-          {/* PROFILE */}
+        {/* =====================================================
+            HERO
+        ===================================================== */}
 
-          <Link
-            to="/profile"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#ddd4e7] text-xs font-semibold transition hover:scale-105"
-          >
-            {user?.name
-              ?.charAt(0)
-              ?.toUpperCase() || "U"}
-          </Link>
+        <section
+          className="
+            overflow-hidden
+            rounded-[28px]
+            border
+            border-[var(--border)]
+            bg-[var(--surface)]
+            shadow-[var(--shadow-md)]
+          "
+        >
 
-        </div>
-
-      </header>
-
-
-      {/* ================================================= */}
-      {/* MAIN */}
-      {/* ================================================= */}
-
-      <main className="mx-auto max-w-[1320px] px-5 py-8 lg:px-8 lg:py-10">
+          <div className="grid lg:grid-cols-[1fr_360px]">
 
 
-        {/* ================================================= */}
-        {/* WELCOME */}
-        {/* ================================================= */}
+            {/* =================================================
+                HERO LEFT
+            ================================================= */}
 
-        <section className="relative grid overflow-hidden rounded-[30px] bg-[#ddd5e8] lg:grid-cols-[1fr_360px]">
-
-          {/* LEFT */}
-
-          <div className="relative px-6 py-9 sm:px-10 sm:py-11 lg:px-12 lg:py-14">
-
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#eee9f2] px-3 py-1.5 text-[9px] font-medium text-[#6d6473]">
-
-              <Sparkles size={11} />
-
-              Your skill-sharing space
-
-            </div>
+            <div className="p-7 sm:p-9 lg:p-11">
 
 
-            <h1 className="mt-6 max-w-[650px] text-[37px] font-semibold leading-[0.98] tracking-[-0.06em] sm:text-[52px]">
+              {/* SMALL LABEL */}
 
-              Hi, {firstName}.
-
-              <br />
-
-              What will you
-              <br />
-
-              learn today?
-
-            </h1>
-
-
-            <p className="mt-5 max-w-[500px] text-[12px] leading-6 text-[#706974] sm:text-[13px]">
-
-              Everyone knows something you don't.
-              Find someone who can teach you —
-              and share something you're good at
-              in return.
-
-            </p>
-
-
-            <div className="mt-7 flex flex-wrap gap-2">
-
-              <Link
-                to="/explore"
-                className="inline-flex items-center gap-2 rounded-full bg-[#292722] px-5 py-3 text-[10px] font-medium text-white transition hover:-translate-y-0.5 hover:bg-[#3b3833]"
+              <div
+                className="
+                  mb-5
+                  inline-flex
+                  items-center
+                  gap-2
+                  rounded-full
+                  border
+                  border-[var(--border)]
+                  bg-[var(--pink-soft)]
+                  px-4
+                  py-2
+                "
               >
-                Find a skill
-                <ArrowRight size={13} />
-              </Link>
 
+                <Sparkles
+                  size={14}
+                  className="text-[var(--pink-strong)]"
+                />
 
-              <Link
-                to="/profile"
-                className="inline-flex items-center gap-2 rounded-full bg-white/60 px-5 py-3 text-[10px] font-medium transition hover:bg-white"
-              >
-                Edit my skills
-              </Link>
-
-            </div>
-
-          </div>
-
-
-          {/* RIGHT VISUAL */}
-
-          <div className="relative hidden min-h-[320px] overflow-hidden lg:block">
-
-            {/* circles */}
-
-            <div className="absolute -right-20 -top-20 h-[310px] w-[310px] rounded-full border-[28px] border-[#eeeaf3]/70" />
-
-            <div className="absolute right-14 top-16 h-[205px] w-[205px] rounded-full border-[20px] border-[#cfc4dc]/70" />
-
-
-            {/* floating card */}
-
-            <div className="absolute right-12 top-[86px] w-[220px] rotate-[3deg] rounded-[22px] bg-[#fffdf9] p-5 shadow-[0_20px_50px_rgba(0,0,0,0.08)]">
-
-              <div className="flex items-center justify-between">
-
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f0df91] text-xs font-semibold">
-                  ✦
-                </div>
-
-                <span className="text-[8px] uppercase tracking-[0.15em] text-[#aaa39a]">
-                  Skill match
+                <span
+                  className="
+                    text-[9px]
+                    font-bold
+                    uppercase
+                    tracking-[0.18em]
+                    text-[var(--pink-strong)]
+                  "
+                >
+                  Welcome to TimeSwap
                 </span>
 
               </div>
 
 
-              <p className="mt-5 text-[10px] uppercase tracking-[0.15em] text-[#aaa39a]">
-                Someone can teach you
-              </p>
-
-              <h3 className="mt-1 text-[20px] font-semibold tracking-[-0.04em]">
-                {learning[0] ||
-                  "something new"}
-              </h3>
-
-              <div className="mt-4 flex items-center gap-2 text-[9px] text-[#888178]">
-
-                <Users size={11} />
-
-                People nearby can help
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </section>
-
-
-        {/* ================================================= */}
-        {/* YOUR SKILLS */}
-        {/* ================================================= */}
-
-        <section className="mt-5 grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
-
-
-          {/* LEARN */}
-
-          <div className="rounded-[24px] border border-[#e3ddd5] bg-[#fffdf9] p-6 sm:p-7">
-
-            <div className="flex items-start justify-between">
-
-              <div>
-
-                <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[#aaa39a]">
-                  Your curiosity
-                </p>
-
-                <h2 className="mt-1 text-[23px] font-semibold tracking-[-0.045em]">
-                  Things you want to learn
-                </h2>
-
-              </div>
-
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e8ddea]">
-                <Heart size={15} />
-              </div>
-
-            </div>
-
-
-            {learning.length === 0 ? (
-
-              <EmptySkill
-                text="Add something you're curious about."
-              />
-
-            ) : (
-
-              <div className="mt-6 flex flex-wrap gap-2">
-
-                {learning.map(
-                  (skill, index) => (
-                    <SkillPill
-                      key={skill}
-                      skill={skill}
-                      index={index}
-                    />
-                  )
-                )}
-
-              </div>
-
-            )}
-
-
-            <Link
-              to="/profile"
-              className="mt-7 inline-flex items-center gap-1 text-[10px] font-medium text-[#777168] transition hover:text-[#292722]"
-            >
-              Manage your learning list
-              <ArrowRight size={12} />
-            </Link>
-
-          </div>
-
-
-          {/* TEACH */}
-
-          <div className="rounded-[24px] bg-[#dde5d2] p-6 sm:p-7">
-
-            <div className="flex items-start justify-between">
-
-              <div>
-
-                <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[#78816d]">
-                  Your contribution
-                </p>
-
-                <h2 className="mt-1 text-[22px] font-semibold tracking-[-0.045em]">
-                  Things you teach
-                </h2>
-
-              </div>
-
-              <BookOpen
-                size={17}
-                className="text-[#707966]"
-              />
-
-            </div>
-
-
-            {teaching.length === 0 ? (
-
-              <p className="mt-6 text-[11px] leading-5 text-[#78816d]">
-                Add skills you can share
-                with the community.
-              </p>
-
-            ) : (
-
-              <div className="mt-6 flex flex-wrap gap-1.5">
-
-                {teaching.map(
-                  (skill) => (
-                    <span
-                      key={skill}
-                      className="rounded-full bg-white/70 px-3 py-2 text-[10px] font-medium"
-                    >
-                      {skill}
-                    </span>
-                  )
-                )}
-
-              </div>
-
-            )}
-
-
-            <Link
-              to="/profile"
-              className="mt-6 inline-flex items-center gap-1 text-[10px] font-medium text-[#59604f]"
-            >
-              Update skills
-              <ArrowRight size={12} />
-            </Link>
-
-          </div>
-
-        </section>
-
-
-        {/* ================================================= */}
-        {/* COMMUNITY */}
-        {/* ================================================= */}
-
-        <section className="mt-10">
-
-          <div className="flex items-end justify-between">
-
-            <div>
-
-              <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[#aaa39a]">
-                Community
-              </p>
-
-              <h2 className="mt-1 text-[27px] font-semibold tracking-[-0.05em]">
-                People worth meeting
-              </h2>
-
-              <p className="mt-1 text-[11px] text-[#99938a]">
-                People whose skills might fit yours.
-              </p>
-
-            </div>
-
-
-            <Link
-              to="/explore"
-              className="hidden items-center gap-1 text-[10px] font-medium text-[#777168] sm:flex"
-            >
-              Explore everyone
-              <ChevronRight size={13} />
-            </Link>
-
-          </div>
-
-
-          {/* PEOPLE */}
-
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-            {loading ? (
-
-              <>
-                <Skeleton />
-                <Skeleton />
-                <Skeleton />
-                <Skeleton />
-              </>
-
-            ) : matches.length === 0 ? (
-
-              <EmptyCommunity />
-
-            ) : (
-
-              matches.map(
-                (person, index) => (
-                  <PersonCard
-                    key={person._id}
-                    person={person}
-                    index={index}
+              {/* TITLE */}
+
+              <h1
+                className="
+                  max-w-[650px]
+                  text-[38px]
+                  font-extrabold
+                  leading-[1.05]
+                  tracking-[-0.055em]
+                  sm:text-[48px]
+                  lg:text-[58px]
+                "
+              >
+
+                Hey {firstName} 👋
+
+                <br />
+
+                <span className="text-[var(--pink-strong)]">
+                  What will you
+                </span>
+
+                <br />
+
+                <span className="relative inline-block">
+
+                  learn today?
+
+                  <span
+                    className="
+                      absolute
+                      -bottom-1
+                      left-0
+                      h-[5px]
+                      w-full
+                      rounded-full
+                      bg-[var(--yellow)]
+                    "
                   />
-                )
-              )
 
-            )}
+                </span>
 
-          </div>
-
-        </section>
+              </h1>
 
 
-        {/* ================================================= */}
-        {/* BOTTOM QUOTE */}
-        {/* ================================================= */}
+              {/* DESCRIPTION */}
 
-        <section className="mt-10 overflow-hidden rounded-[25px] bg-[#292722] px-6 py-10 text-white sm:px-10">
-
-          <div className="flex flex-col justify-between gap-7 sm:flex-row sm:items-end">
-
-            <div>
-
-              <p className="text-[9px] uppercase tracking-[0.2em] text-[#aaa59d]">
-                The idea behind SkillSwap
+              <p
+                className="
+                  mt-6
+                  max-w-[570px]
+                  text-[13px]
+                  leading-6
+                  text-[var(--text-secondary)]
+                "
+              >
+                Exchange your time, share what you know,
+                discover new skills and meet people who
+                are just as curious as you.
               </p>
 
-              <h2 className="mt-3 max-w-[600px] text-[27px] font-medium leading-tight tracking-[-0.04em] sm:text-[34px]">
-                Everyone knows something
-                you don't know yet.
-              </h2>
+
+              {/* BUTTONS */}
+
+              <div className="mt-7 flex flex-wrap gap-3">
+
+                <Link
+                  to="/explore"
+                  className="
+                    group
+                    inline-flex
+                    items-center
+                    gap-2
+                    rounded-full
+                    bg-[var(--pink-strong)]
+                    px-6
+                    py-3
+                    text-[11px]
+                    font-bold
+                    text-white
+                    transition
+                    hover:-translate-y-0.5
+                    hover:bg-[var(--purple)]
+                    hover:shadow-[var(--shadow-md)]
+                  "
+                >
+
+                  Explore people
+
+                  <ArrowRight
+                    size={14}
+                    className="transition group-hover:translate-x-1"
+                  />
+
+                </Link>
+
+
+                <Link
+                  to="/profile"
+                  className="
+                    inline-flex
+                    items-center
+                    gap-2
+                    rounded-full
+                    border
+                    border-[var(--border)]
+                    bg-[var(--surface)]
+                    px-6
+                    py-3
+                    text-[11px]
+                    font-bold
+                    text-[var(--text)]
+                    transition
+                    hover:-translate-y-0.5
+                    hover:bg-[var(--surface-soft)]
+                  "
+                >
+
+                  <Plus size={14} />
+
+                  Complete profile
+
+                </Link>
+
+              </div>
+
+
+              {/* TRUST ROW */}
+
+              <div
+                className="
+                  mt-8
+                  flex
+                  flex-wrap
+                  items-center
+                  gap-5
+                  text-[9px]
+                  font-semibold
+                  text-[var(--text-secondary)]
+                "
+              >
+
+                <span className="flex items-center gap-2">
+
+                  <span
+                    className="
+                      h-2.5
+                      w-2.5
+                      rounded-full
+                      bg-[var(--green)]
+                    "
+                  />
+
+                  Learn together
+
+                </span>
+
+
+                <span className="flex items-center gap-2">
+
+                  <span
+                    className="
+                      h-2.5
+                      w-2.5
+                      rounded-full
+                      bg-[var(--pink-strong)]
+                    "
+                  />
+
+                  Give your time
+
+                </span>
+
+
+                <span className="flex items-center gap-2">
+
+                  <span
+                    className="
+                      h-2.5
+                      w-2.5
+                      rounded-full
+                      bg-[var(--yellow)]
+                    "
+                  />
+
+                  Earn credits
+
+                </span>
+
+              </div>
 
             </div>
 
 
-            <Link
-              to="/explore"
-              className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-5 py-3 text-[10px] font-medium text-[#292722] transition hover:-translate-y-0.5"
+            {/* =================================================
+                CREDIT PANEL
+            ================================================= */}
+
+            <div
+              className="
+                m-5
+                rounded-[24px]
+                bg-[var(--lavender)]
+                p-6
+                text-[#302832]
+              "
             >
-              Meet the community
-              <ArrowUpRight size={13} />
-            </Link>
+
+              {/* TOP */}
+
+              <div className="flex items-start justify-between">
+
+                <div
+                  className="
+                    flex
+                    h-11
+                    w-11
+                    items-center
+                    justify-center
+                    rounded-[14px]
+                    bg-[#eee7f3]
+                    text-[var(--purple-strong)]
+                  "
+                >
+
+                  <Coins size={21} />
+
+                </div>
+
+
+                <span
+                  className="
+                    rounded-full
+                    bg-[#eee7f3]
+                    px-3
+                    py-1.5
+                    text-[8px]
+                    font-bold
+                    uppercase
+                    tracking-[0.15em]
+                    text-[#493b52]
+                  "
+                >
+                  Time Credits
+                </span>
+
+              </div>
+
+
+              {/* BALANCE */}
+
+              <p
+                className="
+                  mt-8
+                  text-[9px]
+                  font-bold
+                  uppercase
+                  tracking-[0.18em]
+                  text-[#584b5e]
+                "
+              >
+                Available balance
+              </p>
+
+
+              <div className="mt-1 flex items-end gap-2">
+
+                <span
+                  className="
+                    text-[55px]
+                    font-extrabold
+                    leading-none
+                    tracking-[-0.07em]
+                    text-[#302832]
+                  "
+                >
+                  {credits}
+                </span>
+
+                <span
+                  className="
+                    mb-2
+                    text-[10px]
+                    font-semibold
+                    text-[#584b5e]
+                  "
+                >
+                  credits
+                </span>
+
+              </div>
+
+
+              {/* MINI CARDS */}
+
+              <div className="mt-7 grid grid-cols-2 gap-3">
+
+                <CreditMini
+                  label="Earned"
+                  value={earned}
+                  icon={<Zap size={12} />}
+                  color="yellow"
+                />
+
+                <CreditMini
+                  label="Spent"
+                  value={spent}
+                  icon={<BookOpen size={12} />}
+                  color="pink"
+                />
+
+              </div>
+
+
+              {/* TIP */}
+
+              <div
+                className="
+                  mt-5
+                  rounded-[17px]
+                  bg-[#e9dfed]
+                  p-4
+                "
+              >
+
+                <p
+                  className="
+                    text-[9px]
+                    leading-4
+                    text-[#554a59]
+                  "
+                >
+                  Teach someone for an hour and earn
+                  a credit. Use your credits to learn
+                  from someone else. ✨
+                </p>
+
+              </div>
+
+            </div>
 
           </div>
 
         </section>
 
+
+        {/* =====================================================
+            STATS
+        ===================================================== */}
+
+        <section
+          className="
+            mt-5
+            grid
+            grid-cols-2
+            gap-3
+            lg:grid-cols-4
+          "
+        >
+
+          <StatCard
+            icon={<Coins size={18} />}
+            label="Credits"
+            value={credits}
+            accent="pink"
+          />
+
+          <StatCard
+            icon={<Repeat2 size={18} />}
+            label="Active swaps"
+            value={
+              loading
+                ? "—"
+                : stats.activeSwaps
+            }
+            accent="lavender"
+          />
+
+          <StatCard
+            icon={<Users size={18} />}
+            label="Connections"
+            value={
+              loading
+                ? "—"
+                : stats.peopleConnected
+            }
+            accent="green"
+          />
+
+          <StatCard
+            icon={<Star size={18} />}
+            label="Your rating"
+            value={
+              user?.rating
+                ? Number(user.rating).toFixed(1)
+                : "New"
+            }
+            accent="yellow"
+          />
+
+        </section>
+
+
+        {/* =====================================================
+            MAIN CONTENT
+        ===================================================== */}
+
+        <section
+          className="
+            mt-5
+            grid
+            gap-5
+            lg:grid-cols-[1fr_330px]
+          "
+        >
+
+
+          {/* =================================================
+              LEFT
+          ================================================= */}
+
+          <div className="space-y-5">
+
+
+            {/* =================================================
+                SKILLS
+            ================================================= */}
+
+            <div
+              className="
+                rounded-[26px]
+                border
+                border-[var(--border)]
+                bg-[var(--surface)]
+                p-6
+                shadow-[var(--shadow-sm)]
+              "
+            >
+
+              <div className="flex items-start justify-between">
+
+                <div>
+
+                  <p
+                    className="
+                      text-[9px]
+                      font-bold
+                      uppercase
+                      tracking-[0.2em]
+                      text-[var(--pink-strong)]
+                    "
+                  >
+                    Your skill board
+                  </p>
+
+                  <h2
+                    className="
+                      mt-1
+                      text-[22px]
+                      font-bold
+                      tracking-[-0.04em]
+                    "
+                  >
+                    What you bring & want
+                  </h2>
+
+                </div>
+
+
+                <Link
+                  to="/profile"
+                  className="
+                    flex
+                    h-9
+                    w-9
+                    items-center
+                    justify-center
+                    rounded-full
+                    bg-[var(--lavender-soft)]
+                    text-[var(--purple-strong)]
+                    transition
+                    hover:scale-105
+                  "
+                >
+                  <ArrowRight size={15} />
+                </Link>
+
+              </div>
+
+
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+
+
+                {/* =================================================
+                    TEACH
+                ================================================= */}
+
+                <div
+                  className="
+                    rounded-[22px]
+                    bg-[var(--peach)]
+                    p-5
+                    text-[#35272a]
+                    transition
+                    hover:-translate-y-1
+                  "
+                >
+
+                  <div className="flex items-center justify-between">
+
+                    <div className="flex items-center gap-2">
+
+                      <div
+                        className="
+                          flex
+                          h-10
+                          w-10
+                          items-center
+                          justify-center
+                          rounded-[13px]
+                          bg-[#f3d7ca]
+                          text-[#5d4038]
+                        "
+                      >
+                        <Heart size={16} />
+                      </div>
+
+                      <span
+                        className="
+                          text-[10px]
+                          font-bold
+                          uppercase
+                          tracking-[0.12em]
+                        "
+                      >
+                        I can teach
+                      </span>
+
+                    </div>
+
+
+                    <span
+                      className="
+                        rounded-full
+                        bg-[#f3d7ca]
+                        px-2.5
+                        py-1
+                        text-[8px]
+                        font-bold
+                        text-[#49363b]
+                      "
+                    >
+                      {teachSkills.length}
+                    </span>
+
+                  </div>
+
+
+                  <div className="mt-5 flex flex-wrap gap-2">
+
+                    {teachSkills.length > 0 ? (
+
+                      teachSkills.map((skill, index) => (
+
+                        <span
+                          key={`${skill}-${index}`}
+                          className="
+                            rounded-full
+                            bg-[#f7e5dc]
+                            px-3
+                            py-2
+                            text-[9px]
+                            font-semibold
+                            text-[#49363b]
+                          "
+                        >
+                          {skill}
+                        </span>
+
+                      ))
+
+                    ) : (
+
+                      <span
+                        className="
+                          text-[10px]
+                          font-medium
+                          text-[#604a4e]
+                        "
+                      >
+                        Add skills you can teach
+                      </span>
+
+                    )}
+
+                  </div>
+
+                </div>
+
+
+                {/* =================================================
+                    LEARN
+                ================================================= */}
+
+                <div
+                  className="
+                    rounded-[22px]
+                    bg-[var(--mint)]
+                    p-5
+                    text-[#29332b]
+                    transition
+                    hover:-translate-y-1
+                  "
+                >
+
+                  <div className="flex items-center justify-between">
+
+                    <div className="flex items-center gap-2">
+
+                      <div
+                        className="
+                          flex
+                          h-10
+                          w-10
+                          items-center
+                          justify-center
+                          rounded-[13px]
+                          bg-[#dce8d9]
+                          text-[#405443]
+                        "
+                      >
+                        <BookOpen size={16} />
+                      </div>
+
+                      <span
+                        className="
+                          text-[10px]
+                          font-bold
+                          uppercase
+                          tracking-[0.12em]
+                        "
+                      >
+                        I want to learn
+                      </span>
+
+                    </div>
+
+
+                    <span
+                      className="
+                        rounded-full
+                        bg-[#dce8d9]
+                        px-2.5
+                        py-1
+                        text-[8px]
+                        font-bold
+                        text-[#405443]
+                      "
+                    >
+                      {learnSkills.length}
+                    </span>
+
+                  </div>
+
+
+                  <div className="mt-5 flex flex-wrap gap-2">
+
+                    {learnSkills.length > 0 ? (
+
+                      learnSkills.map((skill, index) => (
+
+                        <span
+                          key={`${skill}-${index}`}
+                          className="
+                            rounded-full
+                            bg-[#e4efe8]
+                            px-3
+                            py-2
+                            text-[9px]
+                            font-semibold
+                            text-[#405443]
+                          "
+                        >
+                          {skill}
+                        </span>
+
+                      ))
+
+                    ) : (
+
+                      <span
+                        className="
+                          text-[10px]
+                          font-medium
+                          text-[#506357]
+                        "
+                      >
+                        Add skills you want to learn
+                      </span>
+
+                    )}
+
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
+
+
+            {/* =================================================
+                QUICK ACTIONS
+            ================================================= */}
+
+            <div>
+
+              <div className="mb-4">
+
+                <p
+                  className="
+                    text-[9px]
+                    font-bold
+                    uppercase
+                    tracking-[0.2em]
+                    text-[var(--pink-strong)]
+                  "
+                >
+                  Keep going
+                </p>
+
+                <h2
+                  className="
+                    mt-1
+                    text-[22px]
+                    font-bold
+                    tracking-[-0.04em]
+                  "
+                >
+                  Quick actions
+                </h2>
+
+              </div>
+
+
+              <div className="grid gap-3 sm:grid-cols-3">
+
+                <QuickAction
+                  to="/explore"
+                  icon={<Compass size={19} />}
+                  title="Find people"
+                  text="Discover skills you can exchange."
+                  className="bg-[var(--pink-soft)]"
+                  iconBg="bg-[var(--pink)]"
+                />
+
+                <QuickAction
+                  to="/swaps"
+                  icon={<Repeat2 size={19} />}
+                  title="View swaps"
+                  text="Check your current connections."
+                  className="bg-[var(--lavender-soft)]"
+                  iconBg="bg-[var(--lavender)]"
+                />
+
+                <QuickAction
+                  to="/messages"
+                  icon={<MessageCircle size={19} />}
+                  title="Messages"
+                  text="Continue your conversations."
+                  className="bg-[var(--yellow-soft)]"
+                  iconBg="bg-[var(--yellow)]"
+                />
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+          {/* =================================================
+              RIGHT SIDEBAR
+          ================================================= */}
+
+          <aside className="space-y-5">
+
+
+            {/* =================================================
+                PROFILE
+            ================================================= */}
+
+            <div
+              className="
+                rounded-[26px]
+                bg-[var(--purple)]
+                p-6
+                text-white
+                shadow-[var(--shadow-md)]
+              "
+            >
+
+              <div className="flex items-center gap-4">
+
+
+                {/* AVATAR */}
+
+                <div
+                  className="
+                    flex
+                    h-14
+                    w-14
+                    shrink-0
+                    items-center
+                    justify-center
+                    overflow-hidden
+                    rounded-full
+                    border-2
+                    border-white/50
+                    bg-white/20
+                    text-sm
+                    font-bold
+                  "
+                >
+
+                  {user?.profilePicture ? (
+
+                    <img
+                      src={user.profilePicture}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+
+                  ) : (
+
+                    getInitials(user?.name)
+
+                  )}
+
+                </div>
+
+
+                {/* USER */}
+
+                <div className="min-w-0">
+
+                  <p
+                    className="
+                      truncate
+                      text-[14px]
+                      font-bold
+                      text-white
+                    "
+                  >
+                    {user?.name || "Your profile"}
+                  </p>
+
+                  <p
+                    className="
+                      mt-1
+                      truncate
+                      text-[9px]
+                      text-white/75
+                    "
+                  >
+                    @{user?.username || "username"}
+                  </p>
+
+                </div>
+
+              </div>
+
+
+              {/* PROGRESS */}
+
+              <div className="mt-7">
+
+                <p
+                  className="
+                    text-[8px]
+                    font-bold
+                    uppercase
+                    tracking-[0.18em]
+                    text-white/75
+                  "
+                >
+                  Your TimeSwap journey
+                </p>
+
+
+                <div
+                  className="
+                    mt-3
+                    h-2
+                    overflow-hidden
+                    rounded-full
+                    bg-white/20
+                  "
+                >
+
+                  <div
+                    className="
+                      h-full
+                      rounded-full
+                      bg-[var(--yellow)]
+                    "
+                    style={{
+                      width: profileProgress,
+                    }}
+                  />
+
+                </div>
+
+
+                <p
+                  className="
+                    mt-2
+                    text-[9px]
+                    text-white/75
+                  "
+                >
+                  Complete your profile to get
+                  better skill matches.
+                </p>
+
+              </div>
+
+
+              {/* PROFILE BUTTON */}
+
+              <Link
+                to="/profile"
+                className="
+                  mt-5
+                  flex
+                  w-full
+                  items-center
+                  justify-center
+                  gap-2
+                  rounded-full
+                  bg-[#f8f3eb]
+                  px-4
+                  py-3
+                  text-[10px]
+                  font-bold
+                  text-[#493b52]
+                  transition
+                  hover:-translate-y-0.5
+                "
+              >
+
+                View profile
+
+                <ArrowRight size={13} />
+
+              </Link>
+
+            </div>
+
+
+            {/* =================================================
+                TIME TIP
+            ================================================= */}
+
+            <div
+              className="
+                rounded-[26px]
+                border
+                border-[var(--border)]
+                bg-[var(--surface)]
+                p-6
+                shadow-[var(--shadow-sm)]
+              "
+            >
+
+              <div className="flex items-center gap-3">
+
+                <div
+                  className="
+                    flex
+                    h-11
+                    w-11
+                    shrink-0
+                    items-center
+                    justify-center
+                    rounded-[14px]
+                    bg-[var(--yellow-soft)]
+                    text-[var(--yellow-dark)]
+                  "
+                >
+                  <Clock3 size={18} />
+                </div>
+
+
+                <div>
+
+                  <p
+                    className="
+                      text-[9px]
+                      font-bold
+                      uppercase
+                      tracking-[0.18em]
+                      text-[var(--pink-strong)]
+                    "
+                  >
+                    Time tip
+                  </p>
+
+                  <h3
+                    className="
+                      mt-1
+                      text-[14px]
+                      font-bold
+                      text-[var(--text)]
+                    "
+                  >
+                    One hour can go a long way.
+                  </h3>
+
+                </div>
+
+              </div>
+
+
+              <p
+                className="
+                  mt-4
+                  text-[10px]
+                  leading-5
+                  text-[var(--text-secondary)]
+                "
+              >
+                Your knowledge is valuable.
+                Share one hour today and turn it
+                into a new opportunity tomorrow. ✨
+              </p>
+
+            </div>
+
+          </aside>
+
+        </section>
 
       </main>
 
@@ -515,250 +1245,306 @@ function Dashboard() {
 }
 
 
-/* ================================================= */
-/* NAV ITEM */
-/* ================================================= */
+/* =========================================================
+   CREDIT MINI
+========================================================= */
 
-function NavItem({
-  to,
-  text,
-  active,
+function CreditMini({
+  label,
+  value,
+  icon,
+  color,
 }) {
+
+  const styles = {
+
+    yellow: {
+      background: "#eee1a2",
+      text: "#554719",
+    },
+
+    pink: {
+      background: "#e7c7d0",
+      text: "#5b3843",
+    },
+
+  };
+
+
+  const style =
+    styles[color] || {
+      background: "#e5dce8",
+      text: "#46384d",
+    };
+
+
   return (
-    <Link
-      to={to}
-      className={`text-[12px] transition ${
-        active
-          ? "font-medium text-[#292722]"
-          : "text-[#89837b] hover:text-[#292722]"
-      }`}
+
+    <div
+      className="
+        rounded-[17px]
+        p-3.5
+      "
+      style={{
+        background: style.background,
+        color: style.text,
+      }}
     >
-      {text}
-    </Link>
+
+      <div
+        className="
+          flex
+          items-center
+          gap-1.5
+          text-[var(--text-secondary)]
+        "
+        style={{
+          color: style.text,
+        }}
+      >
+
+        {icon}
+
+        <span
+          className="
+            text-[8px]
+            font-bold
+            uppercase
+            tracking-[0.1em]
+          "
+        >
+          {label}
+        </span>
+
+      </div>
+
+
+      <p
+        className="
+          mt-2
+          text-[18px]
+          font-bold
+        "
+        style={{
+          color: style.text,
+        }}
+      >
+        {value}
+      </p>
+
+    </div>
+
   );
 }
 
 
-/* ================================================= */
-/* SKILL PILL */
-/* ================================================= */
+/* =========================================================
+   STAT CARD
+========================================================= */
 
-function SkillPill({
-  skill,
-  index,
+function StatCard({
+  icon,
+  label,
+  value,
+  accent,
 }) {
 
-  const backgrounds = [
-    "bg-[#f0df91]",
-    "bg-[#e8ddea]",
-    "bg-[#dde5d2]",
-    "bg-[#eee4d9]",
-  ];
+  const backgrounds = {
 
-  return (
-    <span
-      className={`rounded-full px-4 py-2.5 text-[10px] font-medium ${backgrounds[index % backgrounds.length]}`}
-    >
-      {skill}
-    </span>
-  );
-}
+    pink: "bg-[var(--pink-soft)]",
+
+    lavender: "bg-[var(--lavender-soft)]",
+
+    green: "bg-[var(--mint-soft)]",
+
+    yellow: "bg-[var(--yellow-soft)]",
+
+  };
 
 
-/* ================================================= */
-/* PERSON CARD */
-/* ================================================= */
+  const iconColors = {
 
-function PersonCard({
-  person,
-  index,
-}) {
+    pink: "text-[var(--pink-strong)]",
 
-  const initials =
-    person.name
-      ?.split(" ")
-      .map((word) => word[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase() || "U";
+    lavender: "text-[var(--purple-strong)]",
 
+    green: "text-[var(--green-strong)]",
 
-  const accents = [
-    "bg-[#f0df91]",
-    "bg-[#e8b6d5]",
-    "bg-[#b9c99e]",
-    "bg-[#c9d6e7]",
-  ];
+    yellow: "text-[var(--yellow-dark)]",
+
+  };
 
 
   return (
-    <Link
-      to="/explore"
-      className="group rounded-[23px] border border-[#e3ddd5] bg-[#fffdf9] p-4 transition duration-200 hover:-translate-y-1 hover:shadow-[0_16px_35px_rgba(0,0,0,0.06)]"
-    >
 
-      {/* AVATAR */}
+    <div
+      className="
+        group
+        rounded-[22px]
+        border
+        border-[var(--border)]
+        bg-[var(--surface)]
+        p-5
+        shadow-[var(--shadow-sm)]
+        transition
+        hover:-translate-y-1
+        hover:shadow-[var(--shadow-md)]
+      "
+    >
 
       <div className="flex items-center justify-between">
 
         <div
-          className={`flex h-11 w-11 items-center justify-center rounded-full text-xs font-semibold ${accents[index % accents.length]}`}
+          className={`
+            flex
+            h-10
+            w-10
+            items-center
+            justify-center
+            rounded-[13px]
+            ${backgrounds[accent]}
+            ${iconColors[accent]}
+          `}
         >
-          {initials}
+          {icon}
         </div>
 
-        <ArrowUpRight
+
+        <Sparkles
           size={14}
-          className="text-[#aaa39a] transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+          className="
+            text-[var(--text-muted)]
+            opacity-50
+            transition
+            group-hover:opacity-100
+          "
         />
 
       </div>
 
 
-      {/* NAME */}
+      <p
+        className="
+          mt-5
+          text-[9px]
+          font-bold
+          uppercase
+          tracking-[0.16em]
+          text-[var(--text-muted)]
+        "
+      >
+        {label}
+      </p>
 
-      <div className="mt-5">
 
-        <h3 className="text-[14px] font-semibold tracking-[-0.02em]">
-          {person.name}
-        </h3>
+      <p
+        className="
+          mt-1
+          text-[25px]
+          font-bold
+          tracking-[-0.05em]
+        "
+      >
+        {value}
+      </p>
 
-        <p className="mt-0.5 text-[9px] text-[#aaa39a]">
-          @{person.username}
-        </p>
+    </div>
 
+  );
+}
+
+
+/* =========================================================
+   QUICK ACTION
+========================================================= */
+
+function QuickAction({
+  to,
+  icon,
+  title,
+  text,
+  className,
+  iconBg,
+}) {
+
+  return (
+
+    <Link
+      to={to}
+      className={`
+        group
+        rounded-[22px]
+        border
+        border-[var(--border)]
+        p-5
+        shadow-[var(--shadow-sm)]
+        transition
+        hover:-translate-y-1
+        hover:shadow-[var(--shadow-md)]
+        ${className}
+      `}
+    >
+
+      <div
+        className={`
+          flex
+          h-10
+          w-10
+          items-center
+          justify-center
+          rounded-[13px]
+          ${iconBg}
+        `}
+      >
+        {icon}
       </div>
 
 
-      {/* TEACH */}
-
-      <div className="mt-5">
-
-        <p className="text-[8px] font-semibold uppercase tracking-[0.17em] text-[#aaa39a]">
-          Can teach
-        </p>
-
-        <div className="mt-2 flex flex-wrap gap-1">
-
-          {(person.skillsToTeach || [])
-            .slice(0, 3)
-            .map((skill) => (
-              <span
-                key={skill}
-                className="rounded-full bg-[#f0ece5] px-2.5 py-1.5 text-[9px]"
-              >
-                {skill}
-              </span>
-            ))}
-
-        </div>
-
-      </div>
+      <h3
+        className="
+          mt-5
+          text-[13px]
+          font-bold
+        "
+      >
+        {title}
+      </h3>
 
 
-      {/* LEARN */}
-
-      <div className="mt-4">
-
-        <p className="text-[8px] font-semibold uppercase tracking-[0.17em] text-[#aaa39a]">
-          Wants to learn
-        </p>
-
-        <div className="mt-2 flex flex-wrap gap-1">
-
-          {(person.skillsToLearn || [])
-            .slice(0, 2)
-            .map((skill) => (
-              <span
-                key={skill}
-                className="rounded-full bg-[#eee7f1] px-2.5 py-1.5 text-[9px] text-[#675d6d]"
-              >
-                {skill}
-              </span>
-            ))}
-
-        </div>
-
-      </div>
+      <p
+        className="
+          mt-2
+          text-[9px]
+          leading-4
+          text-[var(--text-secondary)]
+        "
+      >
+        {text}
+      </p>
 
 
-      {/* FOOTER */}
+      <div
+        className="
+          mt-4
+          flex
+          items-center
+          gap-1
+          text-[9px]
+          font-bold
+        "
+      >
 
-      <div className="mt-5 flex items-center justify-between border-t border-[#eee9e1] pt-3">
+        Open
 
-        <span className="text-[8px] text-[#aaa39a]">
-          Skill match
-        </span>
-
-        <span className="text-[10px] font-semibold">
-          ✦
-        </span>
+        <ArrowRight
+          size={11}
+          className="transition group-hover:translate-x-1"
+        />
 
       </div>
 
     </Link>
-  );
-}
 
-
-/* ================================================= */
-/* EMPTY SKILL */
-/* ================================================= */
-
-function EmptySkill({ text }) {
-  return (
-    <div className="mt-6 rounded-[18px] bg-[#f7f4ee] px-5 py-6">
-
-      <p className="text-[11px] leading-5 text-[#99938a]">
-        {text}
-      </p>
-
-    </div>
-  );
-}
-
-
-/* ================================================= */
-/* EMPTY COMMUNITY */
-/* ================================================= */
-
-function EmptyCommunity() {
-  return (
-    <div className="col-span-full rounded-[23px] border border-[#e3ddd5] bg-white px-6 py-14 text-center">
-
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#e9e2ee]">
-        <Users size={17} />
-      </div>
-
-      <h3 className="mt-4 text-[14px] font-semibold">
-        Your community is waiting.
-      </h3>
-
-      <p className="mx-auto mt-2 max-w-sm text-[10px] leading-5 text-[#99938a]">
-        Add some skills to your profile
-        and we'll find people for you.
-      </p>
-
-      <Link
-        to="/profile"
-        className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-[#292722] px-5 py-2.5 text-[10px] text-white"
-      >
-        Add my skills
-        <ArrowRight size={12} />
-      </Link>
-
-    </div>
-  );
-}
-
-
-/* ================================================= */
-/* SKELETON */
-/* ================================================= */
-
-function Skeleton() {
-  return (
-    <div className="h-[290px] animate-pulse rounded-[23px] bg-[#eeeae3]" />
   );
 }
 

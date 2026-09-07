@@ -1,24 +1,49 @@
 const express = require("express");
 
+const router = express.Router();
+
 const {
   sendSwapRequest,
   getReceivedRequests,
   getSentRequests,
+  getMyRequests,
   updateSwapRequest,
 } = require("../controllers/swapController");
 
 const protect = require("../middleware/authMiddleware");
 
-const router = express.Router();
 
-// Send swap request
-router.post("/request", protect, sendSwapRequest);
+// Send request
+router.post(
+  "/request",
+  protect,
+  sendSwapRequest
+);
 
-// Received requests
-router.get("/received", protect, getReceivedRequests);
 
-// Sent requests
-router.get("/sent", protect, getSentRequests);
+// Get all my requests
+router.get(
+  "/request/status",
+  protect,
+  getMyRequests
+);
+
+
+// Get received requests
+router.get(
+  "/request/received",
+  protect,
+  getReceivedRequests
+);
+
+
+// Get sent requests
+router.get(
+  "/request/sent",
+  protect,
+  getSentRequests
+);
+
 
 // Accept / reject request
 router.put(
@@ -26,5 +51,6 @@ router.put(
   protect,
   updateSwapRequest
 );
+
 
 module.exports = router;

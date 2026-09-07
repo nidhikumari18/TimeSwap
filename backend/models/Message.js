@@ -18,9 +18,24 @@ const messageSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+      maxlength: 5000,
     },
 
     read: {
+      type: Boolean,
+      default: false,
+    },
+
+    // Delete only for the current user
+    deletedFor: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+
+    // Delete for everybody
+    deletedForEveryone: {
       type: Boolean,
       default: false,
     },

@@ -9,131 +9,161 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Explore from "./pages/Explore";
-import MySwaps from "./pages/MySwaps";
+import Swaps from "./pages/MySwaps";
 import Messages from "./pages/Messages";
+import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
+import Layout from "./components/Layout";
 import { useAuth } from "./context/AuthContext";
-
 
 function App() {
   const { user, loading } = useAuth();
 
-  // Wait until we know whether the user is logged in
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f7f4ee]">
-
+      <div className="flex min-h-screen items-center justify-center bg-[var(--background)]">
         <div className="flex flex-col items-center">
-
-          <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[#292722] text-white">
+          <div className="flex h-12 w-12 items-center justify-center rounded-[15px] bg-[var(--purple)] text-lg text-white shadow-[var(--shadow-md)]">
             ✦
           </div>
 
-          <p className="mt-4 text-[11px] font-medium text-[#8e887f]">
-            Loading SkillSwap...
+          <p className="mt-4 text-[11px] font-medium tracking-wide text-[var(--text-secondary)]">
+            Loading TimeSwap...
           </p>
 
-        </div>
+          <div className="mt-3 flex gap-1">
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--purple)]" />
 
+            <span
+              className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--purple)]"
+              style={{ animationDelay: "0.15s" }}
+            />
+
+            <span
+              className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--purple)]"
+              style={{ animationDelay: "0.3s" }}
+            />
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
     <BrowserRouter>
-
       <Routes>
 
-        {/* DEFAULT */}
+        {/* =========================
+            PUBLIC ROUTES
+        ========================= */}
 
         <Route
           path="/"
           element={
-            user
-              ? <Navigate to="/dashboard" replace />
-              : <Navigate to="/login" replace />
+            <Navigate
+              to={user ? "/dashboard" : "/login"}
+              replace
+            />
           }
         />
-
-
-        {/* AUTH */}
 
         <Route
           path="/login"
           element={
-            user
-              ? <Navigate to="/dashboard" replace />
-              : <Login />
+            user ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <Login />
+            )
           }
         />
 
         <Route
           path="/register"
           element={
-            user
-              ? <Navigate to="/dashboard" replace />
-              : <Register />
-          }
-        />
-
-
-        {/* APP */}
-
-        <Route
-          path="/dashboard"
-          element={
-            user
-              ? <Dashboard />
-              : <Navigate to="/login" replace />
+            user ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <Register />
+            )
           }
         />
 
         <Route
-          path="/explore"
-          element={
-            user
-              ? <Explore />
-              : <Navigate to="/login" replace />
-          }
+          path="/forgot-password"
+          element={<ForgotPassword />}
         />
 
         <Route
-          path="/swaps"
-          element={
-            user
-              ? <MySwaps />
-              : <Navigate to="/login" replace />
-          }
+          path="/reset-password/:token"
+          element={<ResetPassword />}
         />
+
+        {/* =========================
+            PROTECTED ROUTES
+
+            Navbar + Footer ONLY
+            come from Layout.jsx
+        ========================= */}
 
         <Route
-          path="/messages"
           element={
-            user
-              ? <Messages />
-              : <Navigate to="/login" replace />
+            user ? (
+              <Layout />
+            ) : (
+              <Navigate to="/login" replace />
+            )
           }
-        />
+        >
+          <Route
+            path="/dashboard"
+            element={<Dashboard />}
+          />
 
+          <Route
+            path="/explore"
+            element={<Explore />}
+          />
 
-        {/* UNKNOWN URL */}
+          <Route
+            path="/swaps"
+            element={<Swaps />}
+          />
+
+          <Route
+            path="/messages"
+            element={<Messages />}
+          />
+
+          <Route
+            path="/profile"
+            element={<Profile />}
+          />
+
+          <Route
+            path="/settings"
+            element={<Settings />}
+          />
+        </Route>
+
+        {/* =========================
+            UNKNOWN URL
+        ========================= */}
 
         <Route
           path="*"
           element={
             <Navigate
-              to={
-                user
-                  ? "/dashboard"
-                  : "/login"
-              }
+              to={user ? "/dashboard" : "/login"}
               replace
             />
           }
         />
 
       </Routes>
-
     </BrowserRouter>
   );
 }

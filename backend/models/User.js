@@ -2,6 +2,10 @@ const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema(
   {
+    // ==========================================
+    // BASIC USER INFORMATION
+    // ==========================================
+
     name: {
       type: String,
       required: true,
@@ -28,6 +32,20 @@ const userSchema = new mongoose.Schema(
       required: true,
     },
 
+    passwordResetToken: {
+      type: String,
+      default: null,
+    },
+    
+    passwordResetExpires: {
+      type: Date,
+      default: null,
+    },
+
+    // ==========================================
+    // PROFILE
+    // ==========================================
+
     profilePicture: {
       type: String,
       default: "",
@@ -37,6 +55,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+
+    // ==========================================
+    // SKILLS
+    // ==========================================
 
     skillsToTeach: {
       type: [String],
@@ -48,6 +70,10 @@ const userSchema = new mongoose.Schema(
       default: [],
     },
 
+    // ==========================================
+    // REPUTATION
+    // ==========================================
+
     rating: {
       type: Number,
       default: 0,
@@ -57,7 +83,34 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
+    // ==========================================
+    // 💰 TIME CREDITS
+    // ==========================================
+
+    credits: {
+      type: Number,
+      default: 3,
+      min: 0,
+    },
+
+    totalCreditsEarned: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    totalCreditsSpent: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
+
+  // ==========================================
+  // TIMESTAMPS
+  // ==========================================
+
   {
     timestamps: true,
   }
